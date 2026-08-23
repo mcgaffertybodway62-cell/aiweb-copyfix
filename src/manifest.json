@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "AIWeb CopyFix",
+  "version": "0.1.0",
+  "description": "修复 AI 聊天页面复制代码块时语言标签错位、Markdown 结构丢失的问题。",
+  "permissions": [],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://chat.deepseek.com/*",
+        "https://www.kimi.com/*",
+        "https://kimi.moonshot.cn/*",
+        "https://chatglm.cn/*",
+        "https://www.qianwen.com/*",
+        "https://qianwen.com/*",
+        "https://*.qianwen.com/*",
+        "https://tongyi.aliyun.com/*"
+      ],
+      "js": [
+        "content/config.js",
+        "content/index.js",
+        "content/adapters/deepseek.js",
+        "content/adapters/gemini.js",
+        "content/adapters/kimi.js",
+        "content/adapters/glm.js",
+        "content/adapters/qwen.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

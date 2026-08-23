@@ -1,0 +1,15 @@
+{
+  "name": "aiweb-copyfix",
+  "version": "0.1.0",
+  "description": "修复 AI 聊天页面复制代码块时语言标签错位、Markdown 结构丢失的问题。",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "lint": "node --check src/content/index.js && node --check src/content/adapters/deepseek.js && node --check src/content/adapters/gemini.js && node --check src/content/adapters/kimi.js && node --check src/content/adapters/glm.js && node --check src/content/adapters/qwen.js",
+    "test:e2e": "node test/run.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.1",
+    "playwright-core": "^1.62.1"
+  }
+}

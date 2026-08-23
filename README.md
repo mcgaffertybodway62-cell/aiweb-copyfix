@@ -1,0 +1,121 @@
+# AIWeb CopyFix
+
+修复 AI 聊天页面（ChatGPT / Claude / Gemini 等）选中复制时，代码块结构被破坏的浏览器扩展。
+
+## 问题背景
+
+AI 聊天页面的代码块是「渲染后的 DOM」：
+
+- 语言标签（如 `python`）和 Copy 按钮是真实的 DOM 节点；
+- Markdown 的 ``` 围栏只是样式，不是文本内容。
+
+因此直接选中复制会发生：
+
+1. 语言标签作为一行杂文本混入代码开头；
+2. ``` 围栏完全丢失；
+3. 列表、表格、加粗等 Markdown 结构退化为纯文本。
+
+复制结果示例（错误）：
+
+```
+python
+import os
+print(os.getcwd())
+```
+
+期望结果（正确）：
+
+````
+```python
+import os
+print(os.getcwd())
+```
+````
+
+## 功能规划
+
+- [x] 监听 `copy` 事件，拦截并重写剪贴板内容
+- [x] 识别选区中的代码块，剔除语言标签行、重建 ``` 围栏
+- [x] 全选代码块内容才加围栏；部分选中输出纯文本片段（可在 `src/config.js` 切换）
+- [x] 通用启发式：识别「语言名 + 复制按钮」代码块头部模式
+- [x] 站点适配器：DeepSeek
+- [ ] 站点适配器：ChatGPT、Claude、Gemini（暂走通用启发式）
+- [ ] 选区 HTML → Markdown 整体转换（基于 turndown + GFM 插件）
+- [ ] 设置面板：开关、目标格式（Markdown / 纯文本）
+- [ ] Firefox (MV3) 兼容
+
+## 支持站点
+
+| 站点 | 状态 | 说明 |
+| --- | --- | --- |
+| 站点 | 状态 | 说明 |
+| --- | --- | --- |
+| DeepSeek（chat.deepseek.com） | ✅ 专属适配器 | 适配 `.md-code-block` 容器；banner 在 `pre` 外，语言行不会混入正文 |
+| Gemini（gemini.google.com） | ✅ 专属适配器 | 适配 `<code-block>` 自定义元素容器；头部含大写语言名与下载/Copy 按钮 |
+| Kimi（www.kimi.com） | ✅ 专属适配器 | 适配 `.segment-code` 容器；头部语言名 + 复制按钮，代码体自带 `language-*` class |
+| GLM（chatglm.cn） | ✅ 专属适配器 | 适配 `.code-no-artifacts` 容器；头部 `p.language` 标明类型，代码体为 `pre.hljs` |
+| 通义（www.qianwen.com） | ✅ 专属适配器 | 适配 `.qw-md-code` 容器；行号是真实文本节点，已通过 ignoreSelector 剔除 |
+| ChatGPT | 🧪 通用启发式 | 头部无语言名文本（实测快照确认）；默认复制自带 `text/html`，富文本编辑器可直接渲染，扩展仅补回纯文本的 ``` 围栏 |
+| Claude | 🧪 通用启发式 | 骨架阶段，未做专属适配 |
+
+> 站点改版可能导致选择器失效。实测 DOM 快照保存在 `docs/相关网页的html/`，反馈问题时请附上新的快照文件。
+
+## 目录结构
+
+```
+aiweb-copyfix/
+├── README.md            # 项目说明
+├── AGENTS.md            # AI 协作约定
+├── LICENSE              # MIT
+├── package.json         # 项目元信息
+├── docs/
+│   └── DESIGN.md        # 技术方案设计
+│   └── 相关网页的html/   # 站点 DOM 快照（gitignore，不入库）
+└── src/
+    ├── manifest.json    # Chrome MV3 清单
+    ├── config.js        # 用户配置项
+    └── content/
+        ├── index.js     # 入口：copy 拦截、选区序列化、默认启发式
+        └── adapters/
+            ├── deepseek.js    # DeepSeek 站点适配器
+            ├── gemini.js      # Gemini 站点适配器
+            ├── kimi.js        # Kimi 站点适配器
+            ├── glm.js         # GLM 站点适配器
+            └── qwen.js        # 通义站点适配器
+```
+
+## 快速开始
+
+无需构建步骤，直接以未打包扩展方式加载：
+
+1. 打开 Chrome，访问 `chrome://extensions/`；
+2. 开启右上角「开发者模式」；
+3. 点击「加载已解压的扩展程序」，选择 `src/` 目录；
+4. 在支持的 AI 聊天页面选中内容复制即可生效。
+
+> 注意：更新代码后需回到 `chrome://extensions/` 点击扩展卡片上的「重新加载」↻，否则页面里跑的仍是旧脚本。
+
+## 配置
+
+编辑 `src/config.js`，保存后重载扩展生效：
+
+| 配置项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `fencePartialCode` | `false` | 只选中代码块的部分内容时是否也加 ``` 围栏。`false` = 输出纯文本片段；`true` = 一律加围栏和语言名 |
+
+## 路线图
+
+| 阶段 | 目标 |
+| --- | --- |
+| v0.1 ✅ | copy 事件拦截 + 代码块围栏重建（DeepSeek 专属适配器） |
+| v0.2 | turndown 全选区 Markdown 转换 |
+| v0.3 | 多站点适配器 + 启发式通用匹配 |
+| v0.4 | 设置面板、Firefox 移植 |
+
+## 参与贡献
+
+欢迎提 Issue 和 PR。新增站点适配请参考 `docs/DESIGN.md` 中的适配器约定。
+
+## License
+
+[MIT](./LICENSE)

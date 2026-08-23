@@ -63,9 +63,9 @@ registry.util.makeSiteAdapter({
 
 ### 实测 DOM 结构
 
-快照存于 `docs/相关网页的html/`，以实际抓取为准。
+以下结构来自对各站点真实页面的抓取分析；自动化测试使用 `test/fixtures/` 下按此结构构造的最小合成夹具。
 
-DeepSeek（`docs/相关网页的html/deepseek.html`）：
+DeepSeek（`deepseek.html`）：
 
 ```html
 <div class="md-code-block md-code-block-light">
@@ -81,7 +81,7 @@ DeepSeek（`docs/相关网页的html/deepseek.html`）：
 
 关键点：banner 在 `pre` 之外。若只以 `pre` 为块容器，选中「说明文字 + 代码块」时 `python复制下载` 会混入正文——因此 DeepSeek 适配器以 `.md-code-block` 为块容器，`getCodeElement` 取内层 `pre`。
 
-ChatGPT（`docs/相关网页的html/ChatGPT.html`）：
+ChatGPT（`ChatGPT.html`）：
 
 ```html
 <pre class="overflow-visible! px-0!" data-start data-end>
@@ -96,7 +96,7 @@ ChatGPT（`docs/相关网页的html/ChatGPT.html`）：
 
 关键点：嵌套双 `pre`，且外层 `pre` 混入装饰性 DOM。序列化前按「最外层保留」去重候选块，再经 `getCodeElement` 下钻到真实代码体，避免重复输出。
 
-Gemini（`docs/相关网页的html/Gemini.html`）：
+Gemini（`Gemini.html`）：
 
 ```html
 <code-block>
@@ -114,7 +114,7 @@ Gemini（`docs/相关网页的html/Gemini.html`）：
 
 关键点：容器为 `<code-block>` 自定义元素（Angular），头部与 `pre` 平级——同 DeepSeek 的泄漏模式。语言名首字母大写（`Python`），提取时统一 lowercase 后再匹配 token 规则。
 
-Kimi（`docs/相关网页的html/Kimi.html`）：
+Kimi（`Kimi.html`）：
 
 ```html
 <h3>Python</h3>   <!-- 正文标题，属于内容，保留 -->
@@ -128,7 +128,7 @@ Kimi（`docs/相关网页的html/Kimi.html`）：
 </div>
 ```
 
-GLM（`docs/相关网页的html/GLM.html`）：
+GLM（`GLM.html`）：
 
 ```html
 <div class="code-no-artifacts">
@@ -144,7 +144,7 @@ GLM（`docs/相关网页的html/GLM.html`）：
 </div>
 ```
 
-通义 Qwen（`docs/相关网页的html/Qwen.html`）：
+通义 Qwen（`Qwen.html`）：
 
 ```html
 <div class="… rounded-12 bg-capsule qw-md-code">
@@ -221,7 +221,7 @@ html 由序列化产物直接渲染（散文段落 → `<p>`，代码块 → `<p
 
 文本序列化时在块级边界（父节点切换且任一为 DIV）补 `\n`，兼容 CodeMirror「每行一个 div」的结构，避免多行代码被合并成一行。
 
-自动化测试：`npm run test:e2e` 用 jsdom 加载 docs 快照（禁用页面脚本，无登录墙），注入扩展代码后对每站点 × 六种选区起点断言纯文本与 html 输出，报告写入 `test/report.md`。
+自动化测试：`npm run test:e2e` 用 jsdom 加载 `test/fixtures/` 合成夹具（禁用页面脚本），注入扩展代码后对每站点 × 七种选区起点断言纯文本与 html 输出，报告写入 `test/report.md`。
 
 ## 6. 测试策略
 

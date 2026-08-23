@@ -1,0 +1,22 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pack zip (manifest at zip root)
+        run: cd src && zip -r "../aiweb-copyfix-${{ github.ref_name }}.zip" .
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: aiweb-copyfix-${{ github.ref_name }}.zip
+          generate_release_notes: true

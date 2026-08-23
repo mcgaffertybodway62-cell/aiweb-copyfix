@@ -3,7 +3,7 @@ import path from "node:path";
 import { JSDOM } from "jsdom";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
-const DOCS = path.join(ROOT, "docs", "相关网页的html");
+const DOCS = path.join(ROOT, "test", "fixtures");
 
 const SITES = [
   {
@@ -16,7 +16,7 @@ const SITES = [
     noise: ["复制", "下载"],
   },
   {
-    file: "Gemini.html",
+    file: "gemini.html",
     name: "Gemini",
     url: "https://gemini.google.com/",
     block: "code-block",
@@ -25,7 +25,7 @@ const SITES = [
     noise: ["复制", "下载"],
   },
   {
-    file: "Kimi.html",
+    file: "kimi.html",
     name: "Kimi",
     url: "https://www.kimi.com/",
     block: ".segment-code",
@@ -34,7 +34,7 @@ const SITES = [
     noise: ["复制", "下载"],
   },
   {
-    file: "GLM.html",
+    file: "glm.html",
     name: "GLM",
     url: "https://chatglm.cn/",
     block: ".code-no-artifacts",
@@ -43,7 +43,7 @@ const SITES = [
     noise: ["复制", "下载"],
   },
   {
-    file: "Qwen.html",
+    file: "qwen.html",
     name: "Qwen",
     url: "https://www.qianwen.com/",
     block: ".qw-md-code",

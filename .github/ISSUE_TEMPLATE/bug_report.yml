@@ -1,0 +1,59 @@
+name: Bug 报告
+description: 复制结果不符合预期
+labels: [bug]
+body:
+  - type: dropdown
+    id: site
+    attributes:
+      label: 站点
+      options:
+        - DeepSeek
+        - Gemini
+        - Kimi
+        - GLM
+        - 通义 Qwen
+        - ChatGPT
+        - Claude
+        - 其他
+    validations:
+      required: true
+  - type: dropdown
+    id: target
+    attributes:
+      label: 粘贴目标
+      options:
+        - Typora
+        - 语雀
+        - Obsidian
+        - VS Code
+        - QQ / 微信
+        - Notion
+        - 飞书
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 选区描述
+      placeholder: 例如：从语言标签左侧拖到代码块内，未向下移动，但选区包含了下方多行代码
+    validations:
+      required: true
+  - type: textarea
+    id: inspect
+    attributes:
+      label: inspect 输出
+      description: >
+        选中问题内容后，在页面 Console（无需切换上下文）执行
+        dispatchEvent(new Event("aicopyfix-inspect"))
+        并粘贴以 [aiweb-copyfix] inspect: 开头的打印结果
+    validations:
+      required: true
+  - type: checkboxes
+    id: snapshot
+    attributes:
+      label: DOM 快照
+      options:
+        - label: 已附上当前页面的 HTML 快照，或说明无法提供
+    validations:
+      required: true

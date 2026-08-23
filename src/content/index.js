@@ -198,7 +198,7 @@ function normalizeCode(raw) {
     .replace(/^\n+/, "");
 }
 
-const UI_NOISE_TOKENS = /(复制|下载|拷贝|copy|download)/gi;
+const UI_NOISE_TOKENS = /(复制|下载|拷贝|copy|download|重新生成|重试|regenerate|retry)/gi;
 
 function cleanProse(piece) {
   return piece

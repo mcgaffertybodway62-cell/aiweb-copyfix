@@ -1,6 +1,8 @@
 # AIWeb CopyFix
 
-修复 AI 聊天页面（Deepseek / Qwen / Gemini 等）选中复制时，代码块结构被破坏的浏览器扩展。
+[English](./README.en.md) | 简体中文
+
+修复 AI 聊天页面（DeepSeek / Kimi / 通义 / GLM / Gemini 等）选中复制时，代码块结构被破坏的浏览器扩展。
 
 ## 问题背景
 
@@ -38,16 +40,14 @@ print(os.getcwd())
 - [x] 识别选区中的代码块，剔除语言标签行、重建 ``` 围栏
 - [x] 全选代码块内容才加围栏；部分选中输出纯文本片段（可在 `src/config.js` 切换）
 - [x] 通用启发式：识别「语言名 + 复制按钮」代码块头部模式
-- [x] 站点适配器：DeepSeek
-- [ ] 站点适配器：ChatGPT、Claude、Gemini（暂走通用启发式）
+- [x] 站点适配器：DeepSeek、Gemini、Kimi、GLM、通义 Qwen
+- [ ] 站点适配器：ChatGPT、Claude（暂走通用启发式）
 - [ ] 选区 HTML → Markdown 整体转换（基于 turndown + GFM 插件）
 - [ ] 设置面板：开关、目标格式（Markdown / 纯文本）
 - [ ] Firefox (MV3) 兼容
 
 ## 支持站点
 
-| 站点 | 状态 | 说明 |
-| --- | --- | --- |
 | 站点 | 状态 | 说明 |
 | --- | --- | --- |
 | DeepSeek（chat.deepseek.com） | ✅ 专属适配器 | 适配 `.md-code-block` 容器；banner 在 `pre` 外，语言行不会混入正文 |
@@ -58,30 +58,35 @@ print(os.getcwd())
 | ChatGPT | 🧪 通用启发式 | 头部无语言名文本（实测快照确认）；默认复制自带 `text/html`，富文本编辑器可直接渲染，扩展仅补回纯文本的 ``` 围栏 |
 | Claude | 🧪 通用启发式 | 骨架阶段，未做专属适配 |
 
-> 站点改版可能导致选择器失效。实测 DOM 快照保存在 `docs/相关网页的html/`，反馈问题时请附上新的快照文件。
+> 站点改版可能导致选择器失效。测试用最小合成夹具见 `test/fixtures/`；真实站点快照含对话隐私，保存在仓库之外。
+
+[![CI](https://github.com/mcgaffertybodway62-cell/aiweb-copyfix/actions/workflows/ci.yml/badge.svg)](https://github.com/mcgaffertybodway62-cell/aiweb-copyfix/actions/workflows/ci.yml)
+![License](https://img.shields.io/badge/license-MIT-green)
 
 ## 目录结构
 
 ```
 aiweb-copyfix/
-├── README.md            # 项目说明
-├── AGENTS.md            # AI 协作约定
-├── LICENSE              # MIT
-├── package.json         # 项目元信息
+├── .github/
+│   ├── workflows/        # CI 与 Release 自动化
+│   └── ISSUE_TEMPLATE/   # Bug 报告模板
+├── AGENTS.md             # AI 协作约定
+├── CONTRIBUTING.md       # 参与贡献
+├── SECURITY.md           # 安全策略
+├── LICENSE               # MIT
+├── package.json          # 项目元信息
 ├── docs/
-│   └── DESIGN.md        # 技术方案设计
-│   └── 相关网页的html/   # 站点 DOM 快照（gitignore，不入库）
+│   ├── DESIGN.md         # 技术方案设计
+│   └── PUBLISH.md        # 发布与仓库运营手册
+├── test/
+│   ├── run.mjs           # 测试入口（npm run test:e2e）
+│   └── fixtures/         # 各站点最小合成夹具
 └── src/
-    ├── manifest.json    # Chrome MV3 清单
-    ├── config.js        # 用户配置项
+    ├── manifest.json     # Chrome MV3 清单
+    ├── config.js         # 用户配置项
     └── content/
-        ├── index.js     # 入口：copy 拦截、选区序列化、默认启发式
-        └── adapters/
-            ├── deepseek.js    # DeepSeek 站点适配器
-            ├── gemini.js      # Gemini 站点适配器
-            ├── kimi.js        # Kimi 站点适配器
-            ├── glm.js         # GLM 站点适配器
-            └── qwen.js        # 通义站点适配器
+        ├── index.js      # 入口：copy 拦截、选区序列化、默认启发式
+        └── adapters/     # 五个站点适配器
 ```
 
 ## 快速开始
@@ -103,6 +108,15 @@ aiweb-copyfix/
 | --- | --- | --- |
 | `fencePartialCode` | `false` | 只选中代码块的部分内容时是否也加 ``` 围栏。`false` = 输出纯文本片段；`true` = 一律加围栏和语言名 |
 
+## 开发与测试
+
+```
+npm run lint        # 语法检查全部内容脚本
+npm run test:e2e    # jsdom 矩阵：5 站点 x 7 选区场景
+```
+
+测试基于 `test/fixtures/` 下的最小合成夹具（按各站点实测结构构造，零隐私内容）。真实站点 DOM 快照含对话隐私，保存在仓库之外。
+
 ## 路线图
 
 | 阶段 | 目标 |
@@ -114,7 +128,7 @@ aiweb-copyfix/
 
 ## 参与贡献
 
-欢迎提 Issue 和 PR。新增站点适配请参考 `docs/DESIGN.md` 中的适配器约定。
+欢迎提 Issue 和 PR。新增站点适配请参考 `AGENTS.md` 的五步清单与 `docs/DESIGN.md` 中的适配器约定；发版流程见 `docs/PUBLISH.md`。
 
 ## License
 

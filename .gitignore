@@ -3,7 +3,6 @@ dist/
 .DS_Store
 *.log
 *.zip
-docs/相关网页的html/
 .e2e-ext/
 .e2e-profile/
 test/report.md

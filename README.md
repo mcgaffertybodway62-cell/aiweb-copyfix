@@ -1,6 +1,6 @@
 # AIWeb CopyFix
 
-修复 AI 聊天页面（ChatGPT / Claude / Gemini 等）选中复制时，代码块结构被破坏的浏览器扩展。
+修复 AI 聊天页面（Deepseek / Qwen / Gemini 等）选中复制时，代码块结构被破坏的浏览器扩展。
 
 ## 问题背景
 

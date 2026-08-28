@@ -1,6 +1,6 @@
 {
   "name": "aiweb-copyfix",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "修复 AI 聊天页面复制代码块时语言标签错位、Markdown 结构丢失的问题。",
   "license": "MIT",
   "private": true,

@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "AIWeb CopyFix",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "修复 AI 聊天页面复制代码块时语言标签错位、Markdown 结构丢失的问题。",
-  "permissions": [],
+  "permissions": ["clipboardWrite"],
   "content_scripts": [
     {
       "matches": [

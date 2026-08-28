@@ -232,6 +232,10 @@ html 由序列化产物直接渲染，富文本块保留原始标签（`h1/block
 
 文本序列化通过 `crossesBlockBoundary` 在块级边界（`DIV/P/H*/LI/BLOCKQUOTE/TR`）补 `\n`，兼容 CodeMirror「每行一个 div」的多行代码结构。
 
+通用容器（`p/div/section/article`）按“块级分段 + 行内拼接”策略 `join("\n\n")`，对 `codeSet/table/列表/标题/引用/hr/块级数学` 强制分段，避免连续两代码块 `pre` 同父时 `join("")` 合并。
+
+**小按钮复制**：除 `copy` 事件外，另在捕获阶段监听 `click`（`COPY_BUTTON_SELECTOR` + 文本 `复制/Copy` 回退），通过 `buttonBlock` 定位最近 `isBlock` 或 `findCodeBlocks` 容器，以 `forcedHeaderTouched=true` 调用 `buildCodePiece/markdownCode/htmlCode` 生成围栏，并经 `navigator.clipboard.write`（`ClipboardItem` 双格式）→ `writeText` → `execCommand` 三级回退写回；同时代理 `navigator.clipboard.writeText` 将站点按钮传入的裸代码替换为围栏版本。需 `permissions: ["clipboardWrite"]`。
+
 自动化测试：`npm run test:e2e` 用 jsdom 加载 `test/fixtures/` 合成夹具（禁用页面脚本），注入扩展代码后对每站点 × 七种选区起点断言纯文本与 html 输出，报告写入 `test/report.md`。
 
 ## 6. 测试策略

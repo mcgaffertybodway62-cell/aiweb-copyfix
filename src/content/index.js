@@ -205,7 +205,7 @@ function cleanProse(piece) {
     .map((para) =>
       para
         .split("\n")
-        .map((line) => line.replace(UI_NOISE_TOKENS, "").replace(/(?<!~)~(?!~)/g, "").trimEnd())
+        .map((line) => line.replace(UI_NOISE_TOKENS, "").trimEnd())
         .filter((line) => line.trim())
         .join("\n"),
     )
@@ -285,15 +285,45 @@ function selectedText(node, range) {
 
 function mathSource(el) {
   const annotation = el.querySelector("annotation[encoding='application/x-tex'], annotation");
-  return annotation?.textContent?.trim() || el.getAttribute("data-math-source") || el.getAttribute("data-math") || el.getAttribute("aria-label") || "";
+  if (annotation?.textContent?.trim()) return annotation.textContent.trim();
+  const holder = el.closest?.("[data-math-source], [data-math], [aria-label]");
+  return (
+    holder?.getAttribute("data-math-source") ||
+    holder?.getAttribute("data-math") ||
+    holder?.getAttribute("aria-label") ||
+    ""
+  ).trim();
 }
 
 function isMath(el) {
-  return el.matches?.(".katex, .katex-display, .katex-wrapper, .math-display, .math-block, .math-inline, .qk-md-katext, .qk-md-katext-block, .qk-md-katext-inline, [role='math'], [data-math-source], [data-math]");
+  return el.matches?.(".katex, .katex-display, .katex-wrapper, .math-display, .math-block, .math-inline, .qk-md-katext, .qk-md-katext-block, .qk-md-katext-inline, eqn, eq, math, [role='math'], [data-math-source], [data-math]");
 }
 
 function isMathBlock(el) {
-  return el.matches?.(".katex-display, .math-display, .math-block, .katex-wrapper.math-display, .qk-md-katext-block, eqn, [role='math'][style*='block']") || Boolean(el.closest?.("eqn, .katex-display, .math-display, .math-block"));
+  return el.matches?.(".katex-display, .math-display, .math-block, .katex-wrapper.math-display, .qk-md-katext-block, eqn, [role='math'][style*='block'], math[display='block']") || Boolean(el.closest?.(".katex-display, .math-display, .math-block, .katex-wrapper.math-display, .qk-md-katext-block, eqn, [role='math'][style*='block'], math[display='block']"));
+}
+
+function kimiMathTex(value) {
+  return value.replace(/[−±√²³≤≥×÷∞π]/g, (ch) => ({
+    "−": "-",
+    "±": "\\pm",
+    "√": "\\sqrt",
+    "²": "^2",
+    "³": "^3",
+    "≤": "\\leq",
+    "≥": "\\geq",
+    "×": "\\times",
+    "÷": "\\div",
+    "∞": "\\infty",
+    "π": "\\pi",
+  })[ch]);
+}
+
+function renderedMathSource(el) {
+  const source = mathSource(el);
+  if (source) return source;
+  const visual = el.querySelector(".katex-html")?.textContent.trim() || el.textContent.trim();
+  return kimiMathTex(visual);
 }
 
 function inlineMarkdown(el, range, render) {
@@ -301,7 +331,7 @@ function inlineMarkdown(el, range, render) {
   if (!el.tagName || !range.intersectsNode(el)) return "";
   if (el.matches("button,svg,[aria-hidden='true'],[data-testid*='copy'],[class*='copy-button'],[class*='toolbar'],[class*='action-bar'],[class*='code-info-button']")) return "";
   if (isMath(el)) {
-    const tex = mathSource(el) || el.querySelector(".katex-html")?.textContent.trim() || el.textContent.trim();
+    const tex = renderedMathSource(el);
     if (!tex) return "";
     if (/^\$.*\$$/s.test(tex)) return tex;
     return (isMathBlock(el) ? "$$" + tex + "$$" : "$" + tex + "$");
@@ -363,7 +393,7 @@ function renderRich(root, range, codeSet, emitCode) {
     if (codeSet.has(node)) return emitCode(node);
     if (!range.intersectsNode(node)) return "";
     if (isMath(node)) {
-      const tex = mathSource(node) || node.querySelector(".katex-html")?.textContent.trim() || node.textContent.trim();
+      const tex = renderedMathSource(node);
       if (!tex) return "";
       if (/^\$.*\$$/s.test(tex)) return tex;
       return (isMathBlock(node) ? "$$" + tex + "$$" : "$" + tex + "$");
@@ -373,7 +403,30 @@ function renderRich(root, range, codeSet, emitCode) {
     if (node.matches("hr")) return "---";
     if (node.matches("h1,h2,h3,h4,h5,h6")) return "#".repeat(Number(node.tagName.slice(1))) + " " + Array.from(node.childNodes).map((x) => inlineMarkdown(x, range, render)).join("").trim();
     if (node.matches("blockquote")) return Array.from(node.childNodes).map((x) => render(x)).join("").split("\n").map((x) => "> " + x).join("\n");
-    if (node.matches("p,div,section,article")) return Array.from(node.childNodes).map((x) => render(x)).join("");
+    if (node.matches("p,div,section,article")) {
+      const parts = [];
+      let inline = "";
+      for (const child of node.childNodes) {
+        const value = render(child);
+        if (!value) continue;
+        const block = child.nodeType === Node.ELEMENT_NODE && (
+          codeSet.has(child) ||
+          child.matches("table,ul,ol,hr,p,div,section,article,blockquote,h1,h2,h3,h4,h5,h6") ||
+          isMathBlock(child)
+        );
+        if (block) {
+          if (inline) {
+            parts.push(inline);
+            inline = "";
+          }
+          parts.push(value);
+        } else {
+          inline += value;
+        }
+      }
+      if (inline) parts.push(inline);
+      return parts.join("\n\n");
+    }
     return inlineMarkdown(node, range, render);
   };
   if (codeSet.has(root)) return emitCode(root);
@@ -420,28 +473,7 @@ function serialize(range, impl) {
   const codeCache = new Map();
   const codePiece = (pre) => {
     if (codeCache.has(pre)) return codeCache.get(pre);
-    const codeEl = impl.getCodeElement(pre);
-    const headerTouched = Array.from(impl.headerNodes(pre)).some((n) =>
-      range.intersectsNode(n),
-    );
-    const scope =
-      fullyContains(range, codeEl) || headerTouched
-        ? fullContentsRange(codeEl)
-        : clippedToContents(codeEl, range);
-    const text = util.textInRange(codeEl, scope, impl.ignoreSelector);
-    const fullText = util.textInRange(
-      codeEl,
-      fullContentsRange(codeEl),
-      impl.ignoreSelector,
-    );
-    const piece = {
-      lang: impl.getLanguage(pre),
-      code: text,
-      fence:
-        FENCE_PARTIAL_CODE ||
-        headerTouched ||
-        text.trim() === fullText.trim(),
-    };
+    const piece = buildCodePiece(pre, impl, range);
     codeCache.set(pre, piece);
     return piece;
   };
@@ -469,6 +501,35 @@ function serialize(range, impl) {
   return { plain, html };
 }
 
+function buildCodePiece(block, impl, range, forcedHeaderTouched = false) {
+  const codeEl = impl.getCodeElement(block);
+  const headerTouched = forcedHeaderTouched || Array.from(impl.headerNodes(block)).some((n) => range.intersectsNode(n));
+  const scope = fullyContains(range, codeEl) || headerTouched ? fullContentsRange(codeEl) : clippedToContents(codeEl, range);
+  const text = util.textInRange(codeEl, scope, impl.ignoreSelector);
+  const fullText = util.textInRange(codeEl, fullContentsRange(codeEl), impl.ignoreSelector);
+  return {
+    lang: impl.getLanguage(block),
+    code: text,
+    fence: FENCE_PARTIAL_CODE || headerTouched || text.trim() === fullText.trim(),
+  };
+}
+
+function markdownCode(block, impl, range, forcedHeaderTouched = false) {
+  const piece = buildCodePiece(block, impl, range, forcedHeaderTouched);
+  const code = normalizeCode(piece.code);
+  if (!code) return "";
+  return piece.fence === false ? code : "```" + (piece.lang ?? "") + "\n" + code + "\n```";
+}
+
+function htmlCode(block, impl, range, forcedHeaderTouched = false) {
+  const piece = buildCodePiece(block, impl, range, forcedHeaderTouched);
+  const code = normalizeCode(piece.code);
+  if (!code) return "";
+  if (piece.fence === false) return "<p>" + escapeHtml(code).replace(/\n/g, "<br>") + "</p>";
+  const cls = piece.lang ? ' class="language-' + piece.lang + '"' : "";
+  return "<pre><code" + cls + ">" + escapeHtml(code) + "</code></pre>";
+}
+
 function handleCopy(event) {
   const selection = window.getSelection();
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
@@ -493,6 +554,116 @@ function handleCopy(event) {
 }
 
 document.addEventListener("copy", handleCopy);
+
+const COPY_BUTTON_SELECTOR = 'button[aria-label*="复制"], button[aria-label*="Copy"], [data-testid*="copy"], [class*="copy-button"], [class*="copy-icon"], .copy-table-btn, [data-icon-type*="copy"], .segment-code-header button, .qw-md-code button, [aria-label*="复制"], [aria-label*="Copy"]';
+let latestButtonCopy = null;
+
+function buttonBlock(button, impl) {
+  let cur = button;
+  while (cur) {
+    if (cur.nodeType === Node.ELEMENT_NODE && impl.isBlock(cur)) return cur;
+    cur = cur.parentElement;
+  }
+  cur = button.parentElement;
+  while (cur) {
+    try {
+      const found = impl.findCodeBlocks(cur).find((block) => block.contains(button));
+      if (found) return found;
+    } catch (err) {
+      void err;
+    }
+    cur = cur.parentElement;
+  }
+  return button.closest("pre");
+}
+
+function execCommandWriteText(text) {
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "");
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.appendChild(area);
+  area.select();
+  try {
+    return document.execCommand("copy");
+  } finally {
+    area.remove();
+  }
+}
+
+function writeButtonClipboard(out) {
+  const clipboard = navigator.clipboard;
+  if (clipboard?.write && globalThis.ClipboardItem) {
+    try {
+      return Promise.resolve(clipboard.write([new ClipboardItem({ "text/plain": out.plain, "text/html": out.html })])).catch(() => writeButtonText(out.plain));
+    } catch (err) {
+      void err;
+    }
+  }
+  return writeButtonText(out.plain);
+}
+
+function writeButtonText(text) {
+  const clipboard = navigator.clipboard;
+  if (clipboard?.writeText) {
+    try {
+      return Promise.resolve(clipboard.writeText(text)).catch(() => execCommandWriteText(text));
+    } catch (err) {
+      void err;
+    }
+  }
+  return Promise.resolve(execCommandWriteText(text));
+}
+
+function handleCopyButton(event) {
+  const target = event.target?.nodeType === Node.ELEMENT_NODE ? event.target : event.target?.parentElement;
+  let button = target?.closest?.(COPY_BUTTON_SELECTOR);
+  if (!button) {
+    const cand = target?.closest?.("button, [role='button'], span, div, a");
+    if (cand?.textContent?.trim().match(/^(复制|Copy|复制代码)$/)) button = cand;
+  }
+  if (!button && target?.textContent?.trim().match(/^(复制|Copy|复制代码)$/)) button = target;
+  if (!button) return;
+  const impl = activeImpl();
+  const block = buttonBlock(button, impl);
+  if (!block) return;
+  const range = fullContentsRange(block);
+  const codeEl = impl.getCodeElement(block);
+  const plain = markdownCode(block, impl, range, true);
+  if (!plain) return;
+  const html = htmlCode(block, impl, range, true);
+  latestButtonCopy = {
+    raw: normalizeCode(util.textInRange(codeEl, fullContentsRange(codeEl), impl.ignoreSelector)),
+    plain,
+  };
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  void writeButtonClipboard({ plain, html });
+}
+
+document.addEventListener("click", handleCopyButton, true);
+
+function proxyClipboardWriteText() {
+  const clipboard = navigator.clipboard;
+  if (!clipboard?.writeText || clipboard.writeText.__aiCopyFixProxy) return;
+  const original = clipboard.writeText.bind(clipboard);
+  const wrapped = function (text) {
+    const value = String(text);
+    if (latestButtonCopy && normalizeCode(value) === latestButtonCopy.raw && value !== latestButtonCopy.plain) {
+      return original(latestButtonCopy.plain);
+    }
+    return original(value);
+  };
+  wrapped.__aiCopyFixProxy = true;
+  try {
+    clipboard.writeText = wrapped;
+  } catch (err) {
+    void err;
+  }
+}
+
+proxyClipboardWriteText();
 
 globalThis.AICopyFix.inspect = () => {
   const selection = window.getSelection();

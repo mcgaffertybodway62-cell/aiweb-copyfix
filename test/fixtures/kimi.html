@@ -1,10 +1,17 @@
-<!doctype html><html><body><div class="markdown-body">
-<h1>Markdown 元素测试</h1><h2>细节</h2><blockquote><strong>粗体</strong> <em>斜体</em> <code>内联</code> <a href="https://example.com">链接</a> <del>删除</del></blockquote>
-<p>行内数学 $E=mc^2$ 与 <code>segment-code-inline</code> <a href="https://example.com">链接</a>。</p><hr>
-<table><tr><th align="left">名称</th><th align="center">值</th><th align="right">备注</th></tr><tr><td>a</td><td>b</td><td>c</td></tr></table>
-<ul><li>项目<ul><li>嵌套项目</li></ul></li></ul><ol><li>步骤<ol><li>嵌套步骤</li></ol></li></ol><div class="katex-wrapper math-display"><span class="katex-display"><span class="katex"><span class="katex-html">E=mc^2</span></span></span></div>
-<p>Python：</p><div class="segment-code"><header class="segment-code-header"><span class="segment-code-lang">python</span><span>复制</span><span>下载</span></header><pre class="language-python"><code class="language-python">print(<span>"hello"</span>)
-return <span>0</span></code></pre></div>
-<p>Bash：</p><div class="segment-code"><header class="segment-code-header"><span class="segment-code-lang">bash</span><span>复制</span><span>下载</span></header><pre class="language-bash"><code class="language-bash">echo <span>"hello"</span>
-exit <span>0</span></code></pre></div>
-</div></body></html>
+<!doctype html>
+<html><body>
+<div class="markdown-body">
+  <h1>Markdown 元素测试</h1>
+  <blockquote><p>这是一个 <strong>粗体</strong>、<em>斜体</em>、<code class="segment-code-inline">code_test()</code> 和 <a href="https://example.com">超链接</a>。</p></blockquote>
+  <p>行内数学 $E=mc^2$ 与 <code>inline</code> 链接。</p><hr>
+  <table><thead><tr><th align="left">名称</th><th align="center">值</th><th align="right">备注</th></tr></thead><tbody><tr><td>a</td><td>b</td><td>c</td></tr></tbody></table>
+  <ul><li>项目<ul><li>嵌套项目</li></ul></li></ul><ol><li>步骤<ol><li>嵌套步骤</li></ol></li></ol>
+  <div class="katex-wrapper math-display"><span class="katex-container"><span class="katex"><span class="katex-html">a²+b²=c²</span><annotation encoding="application/x-tex">a^2+b^2=c^2</annotation></span></span></div>
+  <p>Python：</p>
+  <div class="segment-code"><div class="sticky-release"><header class="segment-code-header"><span class="segment-code-lang">python</span><button>复制</button><button>下载</button></header></div><div class="syntax-highlighter"><pre class="language-python"><code class="language-python">print(<span>&quot;hello&quot;</span>)
+return <span>0</span></code></pre></div></div>
+  <p>Bash：</p>
+  <div class="segment-code"><div class="sticky-release"><header class="segment-code-header"><span class="segment-code-lang">bash</span><button>复制</button><button>下载</button></header></div><div class="syntax-highlighter"><pre class="language-bash"><code class="language-bash">echo <span>&quot;hello&quot;</span>
+exit <span>0</span></code></pre></div></div>
+</div>
+</body></html>

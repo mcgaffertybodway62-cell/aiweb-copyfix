@@ -1,11 +1,26 @@
-<!doctype html><html><body><div class="ds-markdown">
-<h1>Markdown 元素测试</h1>
-<blockquote><strong>粗体</strong> <em>斜体</em> <code>内联</code> <a href="https://example.com">链接</a> <del>删除</del></blockquote>
-<p>行内数学 $E=mc^2$ 与 <code>python</code> 链接。</p>
-<hr>
-<table><thead><tr><th align="left">名称</th><th align="center">值</th><th align="right">备注</th></tr></thead><tbody><tr><td>a</td><td>b</td><td>c</td></tr></tbody></table>
-<ul><li>项目<ul><li>嵌套项目</li></ul></li></ul><ol><li>步骤<ol><li>嵌套步骤</li></ol></li></ol>
-<p>块级数学：</p><div class="katex-display"><span class="katex"><annotation>E=mc^2</annotation></span></div>
-<p>Python 示例：</p><div class="md-code-block"><div class="md-code-block-banner"><span>python</span><span>复制</span><span>下载</span></div><pre><span class="token">print(</span><span class="token">"hello"</span><span class="token">)</span></pre></div>
-<p>Bash 示例：</p><div class="md-code-block"><div class="md-code-block-banner"><span>bash</span><span>复制</span><span>下载</span></div><pre><span class="token">echo </span><span class="token">"hello"</span><span class="token"></span></pre></div>
-</div></body></html>
+<!doctype html>
+<html><body>
+<div class="ds-markdown ds-assistant-message-main-content">
+  <h1><span>Markdown 元素测试</span></h1>
+  <blockquote><p class="ds-markdown-paragraph">这是一个引用块，包含 <strong><span>粗体</span></strong>、<em><span>斜体</span></em>、<code>code_test()</code> 和 <a href="https://example.com"><span>超链接</span></a>。</p></blockquote>
+  <p class="ds-markdown-paragraph">行内数学 $E=mc^2$ 与 <code>inline</code> 链接。</p>
+  <hr>
+  <table><thead><tr><th align="left">名称</th><th align="center">值</th><th align="right">备注</th></tr></thead><tbody><tr><td>a</td><td>b</td><td>c</td></tr></tbody></table>
+  <ul><li>项目<ul><li>嵌套项目</li></ul></li></ul>
+  <ol><li>步骤<ol><li>嵌套步骤</li></ol></li></ol>
+  <p>块级数学：</p>
+  <div class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>a</mi><mo>²</mo><mo>+</mo><mi>b</mi><mo>²</mo><mo>=</mo><mi>c</mi><mo>²</mo></mrow><annotation encoding="application/x-tex">a^2+b^2=c^2</annotation></semantics></math></span><span class="katex-html">a²+b²=c²</span></span></div>
+  <p>Python：</p>
+  <div class="md-code-block md-code-block-light">
+    <div class="md-code-block-banner-wrap"><div class="md-code-block-banner md-code-block-banner-lite"><div class="_121d384"><div class="d2a24f03"><span class="d813de27">python</span></div><div class="d2a24f03 _246a029"><div class="efa13877"><div role="button"><span class="code-info-button-text">复制</span></div><div role="button"><span>下载</span></div></div></div></div></div></div>
+    <div class="md-code-block-content"><pre><span class="token">print(</span><span class="token">&quot;hello&quot;</span><span class="token">)</span>
+return <span class="token">0</span></pre></div>
+  </div>
+  <p>Bash：</p>
+  <div class="md-code-block md-code-block-light">
+    <div class="md-code-block-banner-wrap"><div class="md-code-block-banner md-code-block-banner-lite"><div class="_121d384"><div class="d2a24f03"><span class="d813de27">bash</span></div><div class="d2a24f03 _246a029"><div class="efa13877"><div role="button"><span class="code-info-button-text">复制</span></div><div role="button"><span>下载</span></div></div></div></div></div></div>
+    <div class="md-code-block-content"><pre><span class="token">echo </span><span class="token">&quot;hello&quot;</span>
+exit <span class="token">0</span></pre></div>
+  </div>
+</div>
+</body></html>

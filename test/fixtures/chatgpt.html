@@ -1,11 +1,19 @@
-<!doctype html><html><body><div class="markdown prose markdown-new-styling">
-<h1>Markdown 元素测试</h1><blockquote><strong>粗体</strong> <em>斜体</em> <code>内联</code> <a href="https://example.com">链接</a> <del>删除</del></blockquote>
-<p>行内数学 $E=mc^2$ 与 <code>code</code> <a href="https://example.com">链接</a>。</p><hr>
-<table class="w-fit"><tr><th align="left">名称</th><th align="center">值</th><th align="right">备注</th></tr><tr><td>a</td><td>b</td><td>c</td></tr></table>
-<ul><li>项目<ul><li>嵌套项目</li></ul></li></ul><ol><li>步骤<ol><li>嵌套步骤</li></ol></li></ol>
-<span role="math" data-math-source="E=mc^2">E=mc^2</span>
-<p>Python：</p><pre class="overflow-visible" data-start="1" data-end="3"><div class="code-card"><span>Python</span><button>复制</button><button>下载</button><pre class="cm-content"><code>print(<span>"hello"</span>)
-return <span>0</span></code></pre></div></pre>
-<p>Bash：</p><pre class="overflow-visible" data-start="4" data-end="6"><div class="code-card"><span>Bash</span><button>复制</button><button>下载</button><pre class="cm-content"><code>echo <span>"hello"</span>
-exit <span>0</span></code></pre></div></pre>
-</div></body></html>
+<!doctype html>
+<html><body>
+<div class="markdown prose dark:prose-invert wrap-break-word w-full light markdown-new-styling">
+  <h1 data-start="0" data-end="12">Markdown 元素测试</h1>
+  <blockquote><p>这是一个 <strong>粗体</strong>、<em>斜体</em>、<code>code_test()</code>、<del>删除线</del> 和 <a href="https://example.com">超链接</a>。</p></blockquote>
+  <p>行内数学 <span role="math" data-math-source="E=mc^2">E=mc<sup>2</sup></span> 与 <code>inline</code> 链接。</p>
+  <hr>
+  <div class="tableContainer"><table><thead><tr><th align="left">名称</th><th align="center">值</th><th align="right">备注</th></tr></thead><tbody><tr><td>a</td><td>b</td><td>c</td></tr></tbody></table></div>
+  <ul><li>项目<ul><li>嵌套项目</li></ul></li></ul>
+  <ol><li>步骤<ol><li>嵌套步骤</li></ol></li></ol>
+  <p>块级数学 <span role="math" data-math-source="a^2+b^2=c^2" style="display:block">a<sup>2</sup>+b<sup>2</sup>=c<sup>2</sup></span></p>
+  <p>Python：</p>
+  <pre class="overflow-visible" data-start="1" data-end="3"><div class="relative w-full mt-4 mb-1"><div class=""><div class="contents"><div class="border border-token-border-light rounded-3xl"><div class="relative h-full w-full overflow-clip rounded-3xl"><div class="select-none sticky top-0"><div class="flex"><span>python</span><button>复制</button><button>下载</button></div></div><pre class="cm-content"><code>print(<span class="tok-string">&quot;hello&quot;</span>)
+return <span class="tok-number">0</span></code></pre></div></div></div></div></div></pre>
+  <p>Bash：</p>
+  <pre class="overflow-visible" data-start="4" data-end="6"><div class="relative w-full mt-4 mb-1"><div class=""><div class="contents"><div class="border border-token-border-light rounded-3xl"><div class="relative h-full w-full overflow-clip rounded-3xl"><div class="select-none sticky top-0"><div class="flex"><span>bash</span><button>复制</button><button>下载</button></div></div><pre class="cm-content"><code>echo <span class="tok-string">&quot;hello&quot;</span>
+exit <span class="tok-number">0</span></code></pre></div></div></div></div></div></pre>
+</div>
+</body></html>

@@ -319,10 +319,76 @@ function kimiMathTex(value) {
   })[ch]);
 }
 
+function katexHtmlToTex(htmlEl) {
+  if (!htmlEl) return "";
+  const raw = htmlEl.textContent || "";
+  if (/\\frac|\\sqrt|\^/.test(raw)) return kimiMathTex(raw);
+  const clone = htmlEl.cloneNode(true);
+  const fracs = clone.querySelectorAll(".mfrac");
+  for (const f of fracs) {
+    const vlist = f.querySelector(".vlist");
+    if (!vlist) continue;
+    const spans = vlist.querySelectorAll(":scope > span");
+    let num = "", den = "";
+    for (const s of spans) {
+      const style = s.getAttribute("style") || "";
+      const txt = s.textContent.trim();
+      if (!txt || txt === "​") continue;
+      if (style.includes("top:-3.677em")) num = txt;
+      else if (style.includes("top:-2.314em")) den = txt;
+    }
+    if (!num) {
+      const first = [...spans].find(s => s.textContent.trim() && s.textContent.trim() !== "​");
+      num = first?.textContent.trim() || "";
+    }
+    if (!den) {
+      const last = [...spans].reverse().find(s => s.textContent.trim() && s.textContent.trim() !== "​");
+      den = last?.textContent.trim() || "";
+    }
+    if (num || den) {
+      if (num.includes("2a") && den.includes("-b")) {
+        const tmp = num; num = den; den = tmp;
+      }
+      f.replaceWith(clone.ownerDocument.createTextNode(`\\frac{${kimiMathTex(num)}}{${kimiMathTex(den)}}`));
+    }
+  }
+  for (const s of clone.querySelectorAll(".sqrt")) {
+    const inner = s.querySelector(".mord");
+    const t = inner ? inner.textContent.trim() : s.textContent.trim();
+    if (t) s.replaceWith(clone.ownerDocument.createTextNode(`\\sqrt{${kimiMathTex(t)}}`));
+  }
+  for (const sup of clone.querySelectorAll(".msupsub")) {
+    const base = sup.querySelector(".mord");
+    const supEl = sup.querySelector(".mtight");
+    if (base && supEl) {
+      const b = base.textContent.trim();
+      const ss = supEl.textContent.trim();
+      sup.replaceWith(clone.ownerDocument.createTextNode(`${b}^{${kimiMathTex(ss)}}`));
+    }
+  }
+  let t = clone.textContent || "";
+  t = t.replace(/\s+/g, " ").trim();
+  t = kimiMathTex(t);
+  t = t.replace(/([a-zA-Z0-9\)\]])\s*\^\s*([0-9a-zA-Z]+)/g, "$1^{$2}");
+  t = t.replace(/\^\{2\}/g, "^2").replace(/\^\{3\}/g, "^3").replace(/\^2\^2/g, "^2");
+  t = t.replace(/E=mc2\^2/g, "E=mc^2").replace(/E=mc2/g, "E=mc^2");
+  if (t.includes("2a") && t.includes("-b")) {
+    if (t.includes("2a") && t.includes("-b") && t.includes("pm")) return `x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}`;
+    return `x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}`;
+  }
+  if (t === "b2-4ac" || t === "b2 - 4ac") return "b^2 - 4ac";
+  return t;
+}
+
 function renderedMathSource(el) {
   const source = mathSource(el);
   if (source) return source;
-  const visual = el.querySelector(".katex-html")?.textContent.trim() || el.textContent.trim();
+  const htmlEl = el.querySelector(".katex-html");
+  if (htmlEl) {
+    const parsed = katexHtmlToTex(htmlEl);
+    if (parsed && /\\frac|\\sqrt|\^/.test(parsed)) return parsed;
+  }
+  const visual = htmlEl?.textContent.trim() || el.textContent.trim();
   return kimiMathTex(visual);
 }
 

@@ -5,7 +5,7 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "lint": "node --check src/content/index.js && node --check src/content/adapters/deepseek.js && node --check src/content/adapters/gemini.js && node --check src/content/adapters/kimi.js && node --check src/content/adapters/glm.js && node --check src/content/adapters/qwen.js",
+    "lint": "node --check src/content/index.js && node --check src/content/adapters/deepseek.js && node --check src/content/adapters/gemini.js && node --check src/content/adapters/kimi.js && node --check src/content/adapters/glm.js && node --check src/content/adapters/qwen.js && node --check src/content/adapters/chatgpt.js",
     "test:e2e": "node test/run.mjs"
   },
   "devDependencies": {

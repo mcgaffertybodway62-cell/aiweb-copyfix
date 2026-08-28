@@ -40,10 +40,10 @@ document.addEventListener("copy", (event) => {
 | --- | --- |
 | DeepSeek | 容器 `div.md-code-block`，banner 与内层 `pre` 平级；代码体 `pre > span.token*`（无 `<code>`）✅ |
 | Gemini | 容器 `<code-block>` 自定义元素，头部 `.code-block-decoration` 含大写语言名与图标按钮；代码体 `pre > code[data-test-id="code-content"]` ✅ |
-| Kimi | 容器 `div.segment-code`，头部 `header.segment-code-header` 含 `.segment-code-lang` 语言名 + 复制按钮；代码体 `pre.language-x > code.language-x`（Prism token，class 冗余两份）✅ |
-| GLM | 容器 `div.code-no-artifacts`，头部 `.top > p.language` 文本即语言名；代码体 `pre.hljs > code`，行号 `span.line-numbers-rows` 为空 span 无害 ✅ |
-| 通义 Qwen | 容器 `div.qw-md-code`，sticky 头部 span 文本即语言名 + copy/moon/up 按钮；代码体 `pre > code`（react-syntax-highlighter），**行号是真实文本节点** → 适配器声明 `ignoreSelector: ".linenumber"` 剔除 ✅ |
-| ChatGPT | 外层 markdown `pre` 包裹整张卡片（含 Copy 图标按钮），真实代码在嵌套的 `pre.cm-content > code`（CodeMirror）；头部无语言名文本 → 无「语言行混入」问题，仅需重建围栏 🧪 通用启发式可覆盖 |
+| Kimi | 容器 `div.segment-code`，头部 `header.segment-code-header` 含 `.segment-code-lang` 语言名 + 复制按钮；代码体 `pre.language-x > code.language-x`；表格使用 `align`，数学为无 `annotation` 的 `katex-wrapper`，列表存在异常结构 ✅ |
+| GLM | 容器 `div.code-no-artifacts`，头部 `.top > p.language` 文本即语言名；代码体 `pre.hljs > code`；表格使用 `style`，数学为 `eqn` + `katex-display`，列表可能拆成两个 `ol`，并有 `hr` ✅ |
+| 通义 Qwen | 容器 `div.qw-md-code`，sticky 头部 span 文本即语言名 + copy/moon/up 按钮；代码体 `pre > code`；表格对齐写在 `style`，数学有 `annotation`，**行号是真实文本节点** → 适配器声明 `ignoreSelector: ".linenumber"` 剔除 ✅ |
+| ChatGPT | 外层 `pre.overflow-visible` 包裹整张卡片（含复制/运行按钮），真实代码在嵌套的 `pre.cm-content > code`（CodeMirror）；具备 `data-start/data-end`、`markdown-new-styling`、SmoothedMarkdown 和头部 Python/Bash 语言名；块级数学是 `span[role="math"][data-math-source]`，行内数学未渲染为 KaTeX 是已知现象 ✅ |
 | Claude | 暂无实测快照；早期推测 `pre > code` + `data-language` 属性，待用户提供快照后核实 |
 
 适配器优先通过工厂函数创建（见 `util.makeSiteAdapter`），只需声明容器选择器与代码元素选择器：
@@ -81,7 +81,7 @@ DeepSeek（`deepseek.html`）：
 
 关键点：banner 在 `pre` 之外。若只以 `pre` 为块容器，选中「说明文字 + 代码块」时 `python复制下载` 会混入正文——因此 DeepSeek 适配器以 `.md-code-block` 为块容器，`getCodeElement` 取内层 `pre`。
 
-ChatGPT（`ChatGPT.html`）：
+ChatGPT（`chatgpt.html`）：
 
 ```html
 <pre class="overflow-visible! px-0!" data-start data-end>
@@ -94,7 +94,9 @@ ChatGPT（`ChatGPT.html`）：
 </pre>
 ```
 
-关键点：嵌套双 `pre`，且外层 `pre` 混入装饰性 DOM。序列化前按「最外层保留」去重候选块，再经 `getCodeElement` 下钻到真实代码体，避免重复输出。
+关键点：`data-start/data-end` 标记代码范围，页面使用 `markdown-new-styling`、SmoothedMarkdown；嵌套双 `pre` 的 CodeMirror 结构中，外层卡片还提供复制/运行按钮和已有语言名。序列化前按「最外层保留」去重候选块，再经 ChatGPT 适配器下钻到真实代码体，避免重复输出。数学通过 `role="math"` 与 `data-math-source` 表示；行内 `$..$` 未渲染为 KaTeX 是已知现象。
+
+GPT 测试内容与其它站点使用同一组 Markdown 语义：标题、富文本引用、表格、嵌套列表、分隔线、行内与块级数学，以及 Python/Bash 两张代码卡片。夹具仅模拟 DOM 形状，不保存原始 715KB 快照。
 
 Gemini（`Gemini.html`）：
 
@@ -204,11 +206,20 @@ GLM（`GLM.html`）：
 
 ## 4. HTML → Markdown 转换
 
-引入 [turndown](https://github.com/mixmark-io/turndown) 与 `turndown-plugin-gfm`：
+已实现轻量手写规则（无 turndown 依赖，保持“无构建步骤”约束），按 DOM 节点类型分派：
 
-- 代码块规则自定义：输出 ```` ```lang\n...\n``` ````，语言取自适配器而非 class 猜测；
-- GFM 支持表格、任务列表、删除线；
-- 对 `<button>`、SVG 图标等噪音节点注册 `remove` 规则。
+- 标题 `h1-h6` → `#` / `<hN>`
+- 引用 `blockquote` → `> ` / `<blockquote>`
+- 表格 `table` → GFM `| ... |` + 对齐行 `| :--- |`（支持 `align` 与 `style:text-align` 两派）/ 保留 `<table>`
+- 列表 `ul/ol/li` → `- ` / `1. ` 带 `depth*2` 空格缩进，兼容 `ol start` 与 `ul` 误带 `start`，递归处理 `li > ul/ol` 混合嵌套 / 保留 `<ul>/<ol>`
+- 行内 `code`（不在 `pre` 内）→ `` ` `` / `<code>`，块级 `pre` 仍走围栏
+- 链接 `a[href]` → `[text](url)` / `<a>`，空 `href` 与 `javascript:` 过滤，非文本链接丢弃
+- 强调 `strong/b` → `**` / `em/i` → `*` / `s/del` → `~~`
+- 分隔线 `hr` → `---` / `<hr>`
+- 数学：优先 `annotation[encoding="application/x-tex"]` → `data-math-source` → `data-math` → `aria-label` → 回退 `katex-html` 可视文本；块级 `katex-display / math-display / qk-md-katext-block / eqn / [role=math][style*=block]` → `$$tex$$`，其余 `\$tex\$`；行内已含 `\$..\$` 不二次包裹；HTML 侧保留原始 KaTeX/MathML
+- 噪音 `<button> <svg> [aria-hidden] [data-testid*=copy]` 等在 `renderRich/renderHtml` 入口直接丢弃
+
+代码块仍走适配器围栏逻辑，与上述富文本在 `renderRich` 中按原 DOM 顺序共存；`cleanProse` 仅剥离 UI 词元并 `trimEnd` 保留列表缩进。
 
 ## 5. 剪贴板写回
 
@@ -217,9 +228,9 @@ GLM（`GLM.html`）：
 - `text/plain`：修正后的 Markdown（重建围栏、剔除装饰性头部）；
 - `text/html`：由同一份 pieces 渲染——散文段落 → `<p>`，代码块 → `<pre><code class="language-x">`。
 
-html 由序列化产物直接渲染（散文段落 → `<p>`，代码块 → `<pre><code class="language-x">`），页面原始节点不进入剪贴板。散文清洗规则：按行剥离已知 UI 词元（复制/下载/copy/download 等），整行剥空则丢弃，覆盖气泡工具栏按钮文字连写的情况。
+html 由序列化产物直接渲染，富文本块保留原始标签（`h1/blockquote/table/ul/ol/hr/a/strong/em/del/code`），代码块 → `<pre><code class="language-x">`，数学保留原始 KaTeX/MathML；散文清洗仅剥离 UI 词元并保留列表缩进。
 
-文本序列化时在块级边界（父节点切换且任一为 DIV）补 `\n`，兼容 CodeMirror「每行一个 div」的结构，避免多行代码被合并成一行。
+文本序列化通过 `crossesBlockBoundary` 在块级边界（`DIV/P/H*/LI/BLOCKQUOTE/TR`）补 `\n`，兼容 CodeMirror「每行一个 div」的多行代码结构。
 
 自动化测试：`npm run test:e2e` 用 jsdom 加载 `test/fixtures/` 合成夹具（禁用页面脚本），注入扩展代码后对每站点 × 七种选区起点断言纯文本与 html 输出，报告写入 `test/report.md`。
 

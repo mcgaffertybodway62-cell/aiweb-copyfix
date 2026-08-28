@@ -7,12 +7,21 @@ const DOCS = path.join(ROOT, "test", "fixtures");
 
 const SITES = [
   {
+    file: "chatgpt.html",
+    name: "ChatGPT",
+    url: "https://chatgpt.com/",
+    block: "pre.overflow-visible",
+    code: "pre.cm-content code",
+    lang: "python",
+    noise: ["复制", "下载"],
+  },
+  {
     file: "deepseek.html",
     name: "DeepSeek",
     url: "https://chat.deepseek.com/",
     block: ".md-code-block",
     code: "pre",
-    lang: "c",
+    lang: "python",
     noise: ["复制", "下载"],
   },
   {
@@ -21,7 +30,7 @@ const SITES = [
     url: "https://gemini.google.com/",
     block: "code-block",
     code: 'code[data-test-id="code-content"]',
-    lang: "c",
+    lang: "python",
     noise: ["复制", "下载"],
   },
   {
@@ -30,7 +39,7 @@ const SITES = [
     url: "https://www.kimi.com/",
     block: ".segment-code",
     code: "pre",
-    lang: "c",
+    lang: "python",
     noise: ["复制", "下载"],
   },
   {
@@ -39,7 +48,7 @@ const SITES = [
     url: "https://chatglm.cn/",
     block: ".code-no-artifacts",
     code: "pre.hljs",
-    lang: "c",
+    lang: "python",
     noise: ["复制", "下载"],
   },
   {
@@ -48,7 +57,7 @@ const SITES = [
     url: "https://www.qianwen.com/",
     block: ".qw-md-code",
     code: "pre",
-    lang: "c",
+    lang: "python",
     ignore: ".linenumber",
     noise: ["复制", "下载"],
   },

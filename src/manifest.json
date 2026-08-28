@@ -27,7 +27,8 @@
         "content/adapters/gemini.js",
         "content/adapters/kimi.js",
         "content/adapters/glm.js",
-        "content/adapters/qwen.js"
+        "content/adapters/qwen.js",
+        "content/adapters/chatgpt.js"
       ],
       "run_at": "document_idle"
     }

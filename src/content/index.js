@@ -150,9 +150,8 @@ function pruneContained(candidates) {
 }
 
 function crossesBlockBoundary(prev, cur) {
-  return Boolean(
-    prev && cur !== prev && (cur.tagName === "DIV" || prev.tagName === "DIV"),
-  );
+  const blocks = new Set(["DIV", "P", "H1", "H2", "H3", "H4", "H5", "H6", "LI", "BLOCKQUOTE", "TR"]);
+  return Boolean(prev && cur !== prev && (blocks.has(cur.tagName) || blocks.has(prev.tagName)));
 }
 
 function fullContentsRange(el) {
@@ -206,8 +205,8 @@ function cleanProse(piece) {
     .map((para) =>
       para
         .split("\n")
-        .map((line) => line.replace(UI_NOISE_TOKENS, "").trim())
-        .filter(Boolean)
+        .map((line) => line.replace(UI_NOISE_TOKENS, "").replace(/(?<!~)~(?!~)/g, "").trimEnd())
+        .filter((line) => line.trim())
         .join("\n"),
     )
     .filter(Boolean);
@@ -218,6 +217,10 @@ function assemblePlain(pieces) {
   for (const piece of pieces) {
     if (typeof piece === "string") {
       parts.push(...cleanProse(piece));
+      continue;
+    }
+    if (piece.type === "rich") {
+      parts.push(...cleanProse(piece.plain));
       continue;
     }
     const code = normalizeCode(piece.code);
@@ -238,6 +241,10 @@ function assembleHtml(pieces) {
       for (const para of cleanProse(piece)) {
         parts.push("<p>" + escapeHtml(para).replace(/\n/g, "<br>") + "</p>");
       }
+      continue;
+    }
+    if (piece.type === "rich") {
+      if (piece.html.trim()) parts.push(piece.html.trim());
       continue;
     }
     const code = normalizeCode(piece.code);
@@ -268,35 +275,151 @@ function collectBlocks(range, impl) {
   return { searchRoot, blocks: pruneContained(Array.from(candidates)) };
 }
 
+function selectedText(node, range) {
+  if (node.nodeType !== Node.TEXT_NODE || !range.intersectsNode(node)) return "";
+  let s = node.textContent;
+  if (node === range.startContainer) s = s.slice(range.startOffset);
+  if (node === range.endContainer) s = s.slice(0, range.endOffset);
+  return s;
+}
+
+function mathSource(el) {
+  const annotation = el.querySelector("annotation[encoding='application/x-tex'], annotation");
+  return annotation?.textContent?.trim() || el.getAttribute("data-math-source") || el.getAttribute("data-math") || el.getAttribute("aria-label") || "";
+}
+
+function isMath(el) {
+  return el.matches?.(".katex, .katex-display, .katex-wrapper, .math-display, .math-block, .math-inline, .qk-md-katext, .qk-md-katext-block, .qk-md-katext-inline, [role='math'], [data-math-source], [data-math]");
+}
+
+function isMathBlock(el) {
+  return el.matches?.(".katex-display, .math-display, .math-block, .katex-wrapper.math-display, .qk-md-katext-block, eqn, [role='math'][style*='block']") || Boolean(el.closest?.("eqn, .katex-display, .math-display, .math-block"));
+}
+
+function inlineMarkdown(el, range, render) {
+  if (el.nodeType === Node.TEXT_NODE) return selectedText(el, range).replace(/\u00a0/g, " ");
+  if (!el.tagName || !range.intersectsNode(el)) return "";
+  if (el.matches("button,svg,[aria-hidden='true'],[data-testid*='copy'],[class*='copy-button'],[class*='toolbar'],[class*='action-bar'],[class*='code-info-button']")) return "";
+  if (isMath(el)) {
+    const tex = mathSource(el) || el.querySelector(".katex-html")?.textContent.trim() || el.textContent.trim();
+    if (!tex) return "";
+    if (/^\$.*\$$/s.test(tex)) return tex;
+    return (isMathBlock(el) ? "$$" + tex + "$$" : "$" + tex + "$");
+  }
+  if (el.matches("br")) return "\n";
+  const body = Array.from(el.childNodes).map((x) => render(x)).join("");
+  if (el.matches("a[href]")) {
+    const href = el.getAttribute("href") || "";
+    if (/^javascript:/i.test(href) || !href.trim() || body.trim() === "") return body;
+    return "[" + body + "](" + href.replace(/[()]/g, "\\$&") + ")";
+  }
+  if (el.matches("strong, b")) return "**" + body + "**";
+  if (el.matches("em, i")) return "*" + body + "*";
+  if (el.matches("s, del")) return "~~" + body + "~~";
+  if (el.matches("code") && !el.closest("pre")) return "`" + body.replace(/`/g, "\\`") + "`";
+  return body;
+}
+
+function alignOf(cell, table) {
+  const value = cell.getAttribute("align") || cell.style.textAlign || table.style.textAlign || "";
+  return value.toLowerCase();
+}
+
+function tableMarkdown(table, range, render) {
+  const rows = Array.from(table.querySelectorAll(":scope > thead > tr, :scope > tbody > tr, :scope > tr"));
+  if (!rows.length) return "";
+  const cells = rows.map((row) => Array.from(row.children).filter((x) => /^(TH|TD)$/.test(x.tagName)));
+  const width = Math.max(...cells.map((r) => r.length), 0);
+  if (!width) return "";
+  const lines = cells.map((row) => "| " + Array.from({ length: width }, (_, i) => (row[i] ? inlineMarkdown(row[i], range, (x) => render(x)) : "").replace(/\|/g, "\\|").replace(/\n/g, " ")).join(" | ") + " |");
+  const header = cells[0];
+  const separator = "| " + Array.from({ length: width }, (_, i) => {
+    const a = header[i] ? alignOf(header[i], table) : "";
+    return a === "center" ? ":---:" : a === "right" ? "---:" : a === "left" ? ":---" : "---";
+  }).join(" | ") + " |";
+  lines.splice(1, 0, separator);
+  return lines.join("\n");
+}
+
+function listMarkdown(list, range, render, depth = 0) {
+  const ordered = list.tagName === "OL";
+  let number = Number(list.getAttribute("start")) || 1;
+  const out = [];
+  for (const li of Array.from(list.children).filter((x) => x.tagName === "LI")) {
+    if (!range.intersectsNode(li)) continue;
+    const nested = Array.from(li.children).filter((x) => x.matches("ul,ol"));
+    const content = Array.from(li.childNodes).filter((x) => !(x.nodeType === Node.ELEMENT_NODE && x.matches("ul,ol"))).map((x) => x.nodeType === Node.TEXT_NODE ? selectedText(x, range) : inlineMarkdown(x, range, (y) => render(y))).join("").trim();
+    out.push("  ".repeat(depth) + (ordered ? number++ + ". " : "- ") + content);
+    for (const child of nested) out.push(listMarkdown(child, range, render, depth + 1));
+  }
+  return out.join("\n");
+}
+
+function renderRich(root, range, codeSet, emitCode) {
+  const render = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) return selectedText(node, range).replace(/\u00a0/g, " ");
+    if (!node.tagName) return "";
+    if (node.matches("button,svg,[aria-hidden='true'],[data-testid*='copy'],[class*='copy-button'],[class*='toolbar'],[class*='action-bar'],[class*='code-info-button']")) return "";
+    if (codeSet.has(node)) return emitCode(node);
+    if (!range.intersectsNode(node)) return "";
+    if (isMath(node)) {
+      const tex = mathSource(node) || node.querySelector(".katex-html")?.textContent.trim() || node.textContent.trim();
+      if (!tex) return "";
+      if (/^\$.*\$$/s.test(tex)) return tex;
+      return (isMathBlock(node) ? "$$" + tex + "$$" : "$" + tex + "$");
+    }
+    if (node.matches("table")) return tableMarkdown(node, range, render);
+    if (node.matches("ul,ol")) return listMarkdown(node, range, render);
+    if (node.matches("hr")) return "---";
+    if (node.matches("h1,h2,h3,h4,h5,h6")) return "#".repeat(Number(node.tagName.slice(1))) + " " + Array.from(node.childNodes).map((x) => inlineMarkdown(x, range, render)).join("").trim();
+    if (node.matches("blockquote")) return Array.from(node.childNodes).map((x) => render(x)).join("").split("\n").map((x) => "> " + x).join("\n");
+    if (node.matches("p,div,section,article")) return Array.from(node.childNodes).map((x) => render(x)).join("");
+    return inlineMarkdown(node, range, render);
+  };
+  if (codeSet.has(root)) return emitCode(root);
+  const rootCode = Array.from(codeSet).find((block) => block.contains(root));
+  if (rootCode) return emitCode(rootCode);
+  if (root.matches?.("table,ul,ol,hr,h1,h2,h3,h4,h5,h6,blockquote,p")) return render(root).trim();
+  const parts = [];
+  for (const child of root.childNodes) {
+    const value = render(child).trim();
+    if (value) parts.push(value);
+  }
+  return parts.join("\n\n");
+}
+
+function renderHtml(root, range, codeSet, emitCode) {
+  const render = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) return escapeHtml(selectedText(node, range));
+    if (!node.tagName) return "";
+    if (node.matches("button,svg,[aria-hidden='true'],[data-testid*='copy'],[class*='copy-button'],[class*='toolbar'],[class*='action-bar'],[class*='code-info-button']")) return "";
+    if (codeSet.has(node)) return emitCode(node);
+    if (!range.intersectsNode(node)) return "";
+    if (node.matches("table,thead,tbody,tr,th,td,ul,ol,li,blockquote,p,h1,h2,h3,h4,h5,h6,hr")) {
+      const attrs = node.matches("a") ? "" : Array.from(node.attributes).filter((a) => a.name === "align" || a.name === "style" || a.name === "href").map((a) => ` ${a.name}="${escapeHtml(a.value)}"`).join("");
+      return node.matches("hr") ? "<hr>" : "<" + node.tagName.toLowerCase() + attrs + ">" + Array.from(node.childNodes).map(render).join("") + "</" + node.tagName.toLowerCase() + ">";
+    }
+    if (isMath(node)) return node.outerHTML;
+    if (node.matches("a[href]") && !/^javascript:/i.test(node.getAttribute("href"))) return `<a href="${escapeHtml(node.getAttribute("href"))}">${Array.from(node.childNodes).map(render).join("")}</a>`;
+    if (node.matches("strong,b,em,i,s,del,code,br")) return node.outerHTML.replace(/\s(?:class|style|onclick)="[^"]*"/gi, "");
+    return Array.from(node.childNodes).map(render).join("");
+  };
+  if (codeSet.has(root)) return emitCode(root);
+  const rootCode = Array.from(codeSet).find((block) => block.contains(root));
+  if (rootCode) return emitCode(rootCode);
+  if (root.matches?.("table,ul,ol,hr,h1,h2,h3,h4,h5,h6,blockquote,p")) return render(root);
+  return Array.from(root.childNodes).map(render).filter(Boolean).join("\n");
+}
+
 function serialize(range, impl) {
   const { searchRoot, blocks } = collectBlocks(range, impl);
   if (!searchRoot) return null;
   const hit = blocks.filter((p) => range.intersectsNode(p));
-  if (hit.length === 0) return null;
   console.debug("[aiweb-copyfix] impl:", impl.id, "blocks:", hit.length);
-  const pending = new Set(hit);
-  const hitSet = new Set(hit);
-
-  function ownerOf(node, set) {
-    let cur = node.parentElement;
-    while (cur) {
-      if (set.has(cur)) return cur;
-      cur = cur.parentElement;
-    }
-    return null;
-  }
-
-  const pieces = [];
-  let buf = "";
-  let prevParent = null;
-  const flush = () => {
-    const t = buf.replace(/\r\n/g, "\n").trim();
-    if (t) pieces.push(t);
-    buf = "";
-  };
-
-  const emitCode = (pre) => {
-    flush();
+  const codeSet = new Set(hit);
+  const codeCache = new Map();
+  const codePiece = (pre) => {
+    if (codeCache.has(pre)) return codeCache.get(pre);
     const codeEl = impl.getCodeElement(pre);
     const headerTouched = Array.from(impl.headerNodes(pre)).some((n) =>
       range.intersectsNode(n),
@@ -311,47 +434,37 @@ function serialize(range, impl) {
       fullContentsRange(codeEl),
       impl.ignoreSelector,
     );
-    pieces.push({
+    const piece = {
       lang: impl.getLanguage(pre),
       code: text,
       fence:
         FENCE_PARTIAL_CODE ||
         headerTouched ||
         text.trim() === fullText.trim(),
-    });
+    };
+    codeCache.set(pre, piece);
+    return piece;
   };
-
-  const walker = document.createTreeWalker(searchRoot, NodeFilter.SHOW_TEXT);  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-    if (!range.intersectsNode(n)) continue;
-    const owner = ownerOf(n, pending);
-    if (owner) {
-      pending.delete(owner);
-      emitCode(owner);
-      continue;
-    }
-    if (ownerOf(n, hitSet)) continue;
-    let s = n.textContent;
-    if (n === range.startContainer) s = s.slice(range.startOffset);
-    if (n === range.endContainer) s = s.slice(0, range.endOffset);
-    if (!s) continue;
-    const p = n.parentElement;
-    if (crossesBlockBoundary(prevParent, p)) buf += "\n";
-    prevParent = p;
-    buf += s;
-  }
-  flush();
-
-  for (const pre of pending) emitCode(pre);
-
-  const plain = assemblePlain(pieces);
-  const html = assembleHtml(pieces);
+  const markdownCode = (pre) => {
+    const p = codePiece(pre);
+    const code = normalizeCode(p.code);
+    if (!code) return "";
+    return p.fence === false ? code : "```" + (p.lang ?? "") + "\n" + code + "\n```";
+  };
+  const htmlCode = (pre) => {
+    const p = codePiece(pre);
+    const code = normalizeCode(p.code);
+    if (!code) return "";
+    if (p.fence === false) return "<p>" + escapeHtml(code).replace(/\n/g, "<br>") + "</p>";
+    const cls = p.lang ? ' class="language-' + p.lang + '"' : "";
+    return "<pre><code" + cls + ">" + escapeHtml(code) + "</code></pre>";
+  };
+  const plain = cleanProse(renderRich(searchRoot, range, codeSet, markdownCode).replace(/\n{3,}/g, "\n\n").trim()).join("\n\n");
+  const html = renderHtml(searchRoot, range, codeSet, htmlCode);
+  const pieces = hit.map((pre) => ({ type: "code", ...codePiece(pre) }));
   globalThis.AICopyFix.lastRun = {
     impl: impl.id,
-    pieces: pieces.map((p) =>
-      typeof p === "string"
-        ? { type: "text", chars: p.length }
-        : { type: "code", fence: p.fence, chars: p.code.trim().length },
-    ),
+    pieces: pieces.map((p) => ({ type: "code", fence: p.fence, chars: p.code.trim().length })),
   };
   return { plain, html };
 }

@@ -38,7 +38,8 @@ print(os.getcwd())
 
 - Intercepts `copy` events and rewrites the clipboard with correct structure
 - Dual flavor: clean Markdown as `text/plain`, sanitized HTML as `text/html`
-- Site adapters: DeepSeek, Gemini, Kimi, GLM, Qwen — ChatGPT/Claude covered by generic heuristics
+- Site adapters: DeepSeek, Gemini, Kimi, GLM, Qwen, ChatGPT — Claude covered by generic heuristics
+- Full Markdown fidelity: headings, blockquotes, tables, nested lists, inline code, links, bold/italic/strikethrough, horizontal rules, inline/block math
 - Fence rules: full block selection → fenced with language; partial selection → plain fragment (configurable)
 - UI chrome (language labels, copy/download buttons) is stripped from both flavors
 
@@ -51,7 +52,7 @@ print(os.getcwd())
 | Kimi | ✅ dedicated adapter | `.segment-code` container |
 | GLM (chatglm.cn) | ✅ dedicated adapter | `.code-no-artifacts` container |
 | Qwen (qianwen.com) | ✅ dedicated adapter | line numbers are real text nodes, stripped via `ignoreSelector` |
-| ChatGPT | 🧪 generic heuristic | no language label in header; only fences need rebuilding |
+| ChatGPT (chatgpt.com) | ✅ dedicated adapter | `pre.overflow-visible` double CodeMirror (`pre.cm-content code`); supports inline `$..$` and block `data-math-source` math |
 | Claude | 🧪 generic heuristic | not yet snapshotted |
 
 > Sites redesign their DOM over time. Automated tests run against minimal synthetic fixtures in `test/fixtures/` (built from real inspected structures, zero private data). Full-page snapshots with real conversations stay outside this repository.
@@ -82,7 +83,7 @@ Edit `src/config.js`, then reload the extension:
 
 ```
 npm run lint        # syntax-check all content scripts
-npm run test:e2e    # jsdom matrix: 5 sites x 7 selection scenarios
+npm run test:e2e    # jsdom matrix: 6 sites x 7 selection scenarios
 ```
 
 See `AGENTS.md` for contribution conventions and `docs/DESIGN.md` for the technical design.

@@ -40,9 +40,9 @@ print(os.getcwd())
 - [x] 识别选区中的代码块，剔除语言标签行、重建 ``` 围栏
 - [x] 全选代码块内容才加围栏；部分选中输出纯文本片段（可在 `src/config.js` 切换）
 - [x] 通用启发式：识别「语言名 + 复制按钮」代码块头部模式
-- [x] 站点适配器：DeepSeek、Gemini、Kimi、GLM、通义 Qwen
-- [ ] 站点适配器：ChatGPT、Claude（暂走通用启发式）
-- [ ] 选区 HTML → Markdown 整体转换（基于 turndown + GFM 插件）
+- [x] 站点适配器：DeepSeek、Gemini、Kimi、GLM、通义 Qwen、ChatGPT
+- [ ] 站点适配器：Claude（暂走通用启发式）
+- [x] 选区 HTML → Markdown 整体转换（手写规则：标题/引用/表格/列表/行内code/链接/加粗斜体删除线/分隔线/数学）
 - [ ] 设置面板：开关、目标格式（Markdown / 纯文本）
 - [ ] Firefox (MV3) 兼容
 
@@ -55,7 +55,7 @@ print(os.getcwd())
 | Kimi（www.kimi.com） | ✅ 专属适配器 | 适配 `.segment-code` 容器；头部语言名 + 复制按钮，代码体自带 `language-*` class |
 | GLM（chatglm.cn） | ✅ 专属适配器 | 适配 `.code-no-artifacts` 容器；头部 `p.language` 标明类型，代码体为 `pre.hljs` |
 | 通义（www.qianwen.com） | ✅ 专属适配器 | 适配 `.qw-md-code` 容器；行号是真实文本节点，已通过 ignoreSelector 剔除 |
-| ChatGPT | 🧪 通用启发式 | 头部无语言名文本（实测快照确认）；默认复制自带 `text/html`，富文本编辑器可直接渲染，扩展仅补回纯文本的 ``` 围栏 |
+| ChatGPT（chatgpt.com / chat.openai.com） | ✅ 专属适配器 | 适配 `pre.overflow-visible` 双层 CodeMirror（真实代码为 `pre.cm-content code`）；卡片头部含 Python/Bash 语言名，已支持行内 `$..$` 与块级 `data-math-source` 数学 |
 | Claude | 🧪 通用启发式 | 骨架阶段，未做专属适配 |
 
 > 站点改版可能导致选择器失效。测试用最小合成夹具见 `test/fixtures/`；真实站点快照含对话隐私，保存在仓库之外。
@@ -82,11 +82,11 @@ aiweb-copyfix/
 │   ├── run.mjs           # 测试入口（npm run test:e2e）
 │   └── fixtures/         # 各站点最小合成夹具
 └── src/
-    ├── manifest.json     # Chrome MV3 清单
-    ├── config.js         # 用户配置项
-    └── content/
-        ├── index.js      # 入口：copy 拦截、选区序列化、默认启发式
-        └── adapters/     # 五个站点适配器
+     ├── manifest.json     # Chrome MV3 清单
+     ├── config.js         # 用户配置项
+     └── content/
+         ├── index.js      # 入口：copy 拦截、选区序列化、默认启发式
+         └── adapters/     # 六个站点适配器（+ ChatGPT）
 ```
 
 ## 快速开始
@@ -112,7 +112,7 @@ aiweb-copyfix/
 
 ```
 npm run lint        # 语法检查全部内容脚本
-npm run test:e2e    # jsdom 矩阵：5 站点 x 7 选区场景
+ npm run test:e2e    # jsdom 矩阵：6 站点 x 7 选区场景
 ```
 
 测试基于 `test/fixtures/` 下的最小合成夹具（按各站点实测结构构造，零隐私内容）。真实站点 DOM 快照含对话隐私，保存在仓库之外。

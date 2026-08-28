@@ -448,13 +448,43 @@ function renderHtml(root, range, codeSet, emitCode) {
     if (node.matches("button,svg,[aria-hidden='true'],[data-testid*='copy'],[class*='copy-button'],[class*='toolbar'],[class*='action-bar'],[class*='code-info-button']")) return "";
     if (codeSet.has(node)) return emitCode(node);
     if (!range.intersectsNode(node)) return "";
+    if (isMath(node)) {
+      const tex = renderedMathSource(node);
+      if (!tex) return "";
+      if (/^\$.*\$$/s.test(tex)) return isMathBlock(node) ? "<div>" + escapeHtml(tex) + "</div>" : "<span>" + escapeHtml(tex) + "</span>";
+      return isMathBlock(node) ? "<div>" + escapeHtml("$$" + tex + "$$") + "</div>" : "<span>" + escapeHtml("$" + tex + "$") + "</span>";
+    }
     if (node.matches("table,thead,tbody,tr,th,td,ul,ol,li,blockquote,p,h1,h2,h3,h4,h5,h6,hr")) {
       const attrs = node.matches("a") ? "" : Array.from(node.attributes).filter((a) => a.name === "align" || a.name === "style" || a.name === "href").map((a) => ` ${a.name}="${escapeHtml(a.value)}"`).join("");
       return node.matches("hr") ? "<hr>" : "<" + node.tagName.toLowerCase() + attrs + ">" + Array.from(node.childNodes).map(render).join("") + "</" + node.tagName.toLowerCase() + ">";
     }
-    if (isMath(node)) return node.outerHTML;
     if (node.matches("a[href]") && !/^javascript:/i.test(node.getAttribute("href"))) return `<a href="${escapeHtml(node.getAttribute("href"))}">${Array.from(node.childNodes).map(render).join("")}</a>`;
     if (node.matches("strong,b,em,i,s,del,code,br")) return node.outerHTML.replace(/\s(?:class|style|onclick)="[^"]*"/gi, "");
+    if (node.matches("div,section,article")) {
+      const parts = [];
+      let inline = "";
+      for (const child of node.childNodes) {
+        const value = render(child);
+        if (!value) continue;
+        const block = child.nodeType === Node.ELEMENT_NODE && (
+          codeSet.has(child) ||
+          child.matches("table,ul,ol,hr,p,div,section,article,blockquote,h1,h2,h3,h4,h5,h6") ||
+          isMathBlock(child) ||
+          isMath(child)
+        );
+        if (block) {
+          if (inline) {
+            parts.push(inline);
+            inline = "";
+          }
+          parts.push(value);
+        } else {
+          inline += value;
+        }
+      }
+      if (inline) parts.push(inline);
+      return parts.join("\n");
+    }
     return Array.from(node.childNodes).map(render).join("");
   };
   if (codeSet.has(root)) return emitCode(root);

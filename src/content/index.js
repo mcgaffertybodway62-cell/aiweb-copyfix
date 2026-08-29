@@ -296,7 +296,7 @@ function mathSource(el) {
 }
 
 function isMath(el) {
-  return el.matches?.(".katex, .katex-display, .katex-wrapper, .math-display, .math-block, .math-inline, .qk-md-katext, .qk-md-katext-block, .qk-md-katext-inline, eqn, eq, math, [role='math'], [data-math-source], [data-math]");
+  return el.matches?.(".katex, .katex-display, .katex-wrapper, .katex-html, .katex-mathml, .math-display, .math-block, .math-inline, .qk-md-katext, .qk-md-katext-block, .qk-md-katext-inline, eqn, eq, math, [role='math'], [data-math-source], [data-math]");
 }
 
 function isMathBlock(el) {
@@ -324,6 +324,25 @@ function katexHtmlToTex(htmlEl) {
   const raw = htmlEl.textContent || "";
   if (/\\frac|\\sqrt|\^/.test(raw)) return kimiMathTex(raw);
   const clone = htmlEl.cloneNode(true);
+  for (const sup of Array.from(clone.querySelectorAll(".msupsub"))) {
+    const supEl = sup.querySelector(".mtight, .mord.mtight") ?? sup;
+    const supText = supEl?.textContent.trim() || "";
+    if (!supText) continue;
+    let base = sup.previousElementSibling;
+    while (base && !base.matches?.(".mord, .mathnormal")) base = base.previousElementSibling;
+    if (!base) {
+      const parentMord = sup.closest?.(".mord");
+      if (parentMord?.previousElementSibling?.matches?.(".mord")) base = parentMord.previousElementSibling;
+    }
+    const baseText = base?.textContent.trim() || "";
+    if (baseText) {
+      const combined = `${baseText}^{${kimiMathTex(supText)}}`;
+      try { base.remove(); } catch (e) { void e; }
+      sup.replaceWith(clone.ownerDocument.createTextNode(combined));
+    } else {
+      sup.replaceWith(clone.ownerDocument.createTextNode(`^{${kimiMathTex(supText)}}`));
+    }
+  }
   const fracs = clone.querySelectorAll(".mfrac");
   for (const f of fracs) {
     const vlist = f.querySelector(".vlist");
@@ -352,19 +371,17 @@ function katexHtmlToTex(htmlEl) {
       f.replaceWith(clone.ownerDocument.createTextNode(`\\frac{${kimiMathTex(num)}}{${kimiMathTex(den)}}`));
     }
   }
-  for (const s of clone.querySelectorAll(".sqrt")) {
-    const inner = s.querySelector(".mord");
-    const t = inner ? inner.textContent.trim() : s.textContent.trim();
-    if (t) s.replaceWith(clone.ownerDocument.createTextNode(`\\sqrt{${kimiMathTex(t)}}`));
-  }
-  for (const sup of clone.querySelectorAll(".msupsub")) {
-    const base = sup.querySelector(".mord");
-    const supEl = sup.querySelector(".mtight");
-    if (base && supEl) {
-      const b = base.textContent.trim();
-      const ss = supEl.textContent.trim();
-      sup.replaceWith(clone.ownerDocument.createTextNode(`${b}^{${kimiMathTex(ss)}}`));
+  for (const s of Array.from(clone.querySelectorAll(".sqrt"))) {
+    let t = "";
+    const vlist = s.querySelector(".vlist");
+    if (vlist) {
+      const innerMord = s.querySelector('[style*="padding-left"]') ?? s.querySelector(".mord");
+      t = innerMord ? innerMord.textContent.trim() : s.textContent.trim();
+    } else {
+      const inner = s.querySelector(".mord");
+      t = inner ? inner.textContent.trim() : s.textContent.trim();
     }
+    if (t) s.replaceWith(clone.ownerDocument.createTextNode(`\\sqrt{${kimiMathTex(t)}}`));
   }
   let t = clone.textContent || "";
   t = t.replace(/\s+/g, " ").trim();
@@ -383,7 +400,10 @@ function katexHtmlToTex(htmlEl) {
 function renderedMathSource(el) {
   const source = mathSource(el);
   if (source) return source;
-  const htmlEl = el.querySelector(".katex-html");
+  const katexRoot = el.closest?.(".katex") ?? el;
+  const ann = katexRoot.querySelector?.("annotation[encoding='application/x-tex'], annotation");
+  if (ann?.textContent?.trim()) return ann.textContent.trim();
+  const htmlEl = el.matches?.(".katex-html") ? el : el.querySelector(".katex-html");
   if (htmlEl) {
     const parsed = katexHtmlToTex(htmlEl);
     if (parsed && /\\frac|\\sqrt|\^/.test(parsed)) return parsed;
@@ -498,6 +518,27 @@ function renderRich(root, range, codeSet, emitCode) {
   if (codeSet.has(root)) return emitCode(root);
   const rootCode = Array.from(codeSet).find((block) => block.contains(root));
   if (rootCode) return emitCode(rootCode);
+  if (isMath(root)) {
+    const tex = renderedMathSource(root);
+    if (tex) {
+      if (/^\$.*\$$/s.test(tex)) return tex.trim();
+      return (isMathBlock(root) ? "$$" + tex + "$$" : "$" + tex + "$");
+    }
+  }
+  {
+    let cur = root.parentElement;
+    while (cur && cur !== root.ownerDocument.documentElement) {
+      if (isMath(cur) && range.intersectsNode(cur)) {
+        const tex = renderedMathSource(cur);
+        if (tex) {
+          if (/^\$.*\$$/s.test(tex)) return tex.trim();
+          return (isMathBlock(cur) ? "$$" + tex + "$$" : "$" + tex + "$");
+        }
+        break;
+      }
+      cur = cur.parentElement;
+    }
+  }
   if (root.matches?.("table,ul,ol,hr,h1,h2,h3,h4,h5,h6,blockquote,p")) return render(root).trim();
   const parts = [];
   for (const child of root.childNodes) {
@@ -556,6 +597,27 @@ function renderHtml(root, range, codeSet, emitCode) {
   if (codeSet.has(root)) return emitCode(root);
   const rootCode = Array.from(codeSet).find((block) => block.contains(root));
   if (rootCode) return emitCode(rootCode);
+  if (isMath(root)) {
+    const tex = renderedMathSource(root);
+    if (tex) {
+      if (/^\$.*\$$/s.test(tex)) return isMathBlock(root) ? "<div>" + escapeHtml(tex) + "</div>" : "<span>" + escapeHtml(tex) + "</span>";
+      return isMathBlock(root) ? "<div>" + escapeHtml("$$" + tex + "$$") + "</div>" : "<span>" + escapeHtml("$" + tex + "$") + "</span>";
+    }
+  }
+  {
+    let cur = root.parentElement;
+    while (cur && cur !== root.ownerDocument.documentElement) {
+      if (isMath(cur) && range.intersectsNode(cur)) {
+        const tex = renderedMathSource(cur);
+        if (tex) {
+          if (/^\$.*\$$/s.test(tex)) return isMathBlock(cur) ? "<div>" + escapeHtml(tex) + "</div>" : "<span>" + escapeHtml(tex) + "</span>";
+          return isMathBlock(cur) ? "<div>" + escapeHtml("$$" + tex + "$$") + "</div>" : "<span>" + escapeHtml("$" + tex + "$") + "</span>";
+        }
+        break;
+      }
+      cur = cur.parentElement;
+    }
+  }
   if (root.matches?.("table,ul,ol,hr,h1,h2,h3,h4,h5,h6,blockquote,p")) return render(root);
   return Array.from(root.childNodes).map(render).filter(Boolean).join("\n");
 }
@@ -639,8 +701,13 @@ function handleCopy(event) {
     return;
   }
   if (!out || !out.plain) return;
-  event.clipboardData.setData("text/plain", out.plain);
-  event.clipboardData.setData("text/html", out.html);
+  if (!event.clipboardData) return;
+  try {
+    event.clipboardData.setData("text/plain", out.plain);
+    event.clipboardData.setData("text/html", out.html);
+  } catch (err) {
+    return;
+  }
   event.preventDefault();
   console.debug("[aiweb-copyfix] rewrote clipboard:", {
     impl: impl.id,

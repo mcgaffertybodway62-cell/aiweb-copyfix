@@ -191,6 +191,40 @@ function scenarios(window, site) {
       r.selectNodeContents(rootMsg);
     }),
   );
+  const math = doc.querySelector(".katex-display, .katex, [role='math'], .katex-wrapper, .math-display, eqn");
+  if (math) {
+    out.push(run("math:block-only", (r) => r.selectNodeContents(math)));
+    const parent = math.closest("p, div") || math.parentElement;
+    if (parent && parent.previousElementSibling) {
+      out.push(run("math:block+above", (r) => { r.setStart(parent.previousElementSibling, 0); r.setEnd(math, math.childNodes.length); }));
+    }
+    if (parent && parent.nextElementSibling) {
+      out.push(run("math:block+below", (r) => { r.setStart(math, 0); r.setEnd(parent.nextElementSibling, 0); }));
+    }
+    const markdown = doc.querySelector("div.markdown, div.markdown-body, div.answer-content-wrap, article");
+    if (markdown) {
+      out.push(run("math:markdown-whole", (r) => r.selectNodeContents(markdown)));
+      if (markdown.parentElement && markdown.parentElement !== doc.body) {
+        out.push(run("math:parent-whole", (r) => r.selectNodeContents(markdown.parentElement)));
+      }
+    }
+    const katexHtml = math.matches(".katex-html") ? math : math.querySelector(".katex-html");
+    const target = katexHtml || math;
+    if (target.childNodes.length > 1) {
+      out.push(run("math:partial-tail", (r) => { r.setStart(target, 0); r.setEnd(target, 1); }));
+    }
+    const inline = doc.querySelector('[role="math"]:not([style*="block"]), .katex:not(.katex-display) .katex-html');
+    if (inline && inline !== math) {
+      out.push(run("math:inline-only", (r) => r.selectNodeContents(inline)));
+    }
+  }
+  const markdownRoot = doc.querySelector("div.markdown, div.markdown-body");
+  if (markdownRoot) {
+    out.push(run("parent:markdown-whole", (r) => r.selectNodeContents(markdownRoot)));
+    if (markdownRoot.parentElement && markdownRoot.parentElement !== doc.body) {
+      out.push(run("parent:parent-whole", (r) => r.selectNodeContents(markdownRoot.parentElement)));
+    }
+  }
   return out;
 }
 
@@ -200,11 +234,16 @@ function judge(site, r) {
   const fenced = r.plain.includes("```");
   const noisy = site.noise.filter((w) => r.plain.includes(w) || (r.html && r.html.includes(w)));
   const reasons = [];
-        if (r.name === "partial-code") {
-          if (fenced) reasons.push("expected raw fragment but found fence");
-          if (r.html && r.html.includes("<pre"))
-            reasons.push("html should not contain pre for fragment");
-        } else {
+  if (r.name.startsWith("math:")) {
+    const hasMath = r.plain.includes("$") || r.plain.includes("\\frac") || r.plain.includes("\\sqrt");
+    if (!hasMath) reasons.push("math fence missing $");
+    if (r.plain.includes("ca+b") && r.plain.includes("x2+y2") && !r.plain.includes("\\frac")) reasons.push("visual leak ca+b");
+  } else if (r.name.startsWith("parent:")) {
+    if (!fenced) reasons.push("missing fence in parent whole");
+  } else if (r.name === "partial-code") {
+    if (fenced) reasons.push("expected raw fragment but found fence");
+    if (r.html && r.html.includes("<pre")) reasons.push("html should not contain pre for fragment");
+  } else {
     if (!fenced) reasons.push("missing fence");
     else if (!r.plain.includes("```" + site.lang)) reasons.push(`fence language != ${site.lang}`);
   }

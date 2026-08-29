@@ -2,7 +2,7 @@
 
 ## 报告漏洞
 
-请勿通过公开 Issue 报告安全问题，发送邮件至 1526447263@qq.com。
+请勿通过公开 Issue 报告安全问题。请通过仓库 **Security → Report a vulnerability**（Private vulnerability reporting）私下报告；如无法使用该入口，可在 Issues 留言请求私下联系方式。
 
 请在报告中包含：复现步骤、受影响版本、可能的修复思路。收到后 72 小时内确认，修复随下一个 patch 版本发布并在 Release notes 致谢。
 

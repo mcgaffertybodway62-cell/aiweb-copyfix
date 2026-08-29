@@ -216,7 +216,7 @@ GLM（`GLM.html`）：
 - 链接 `a[href]` → `[text](url)` / `<a>`，空 `href` 与 `javascript:` 过滤，非文本链接丢弃
 - 强调 `strong/b` → `**` / `em/i` → `*` / `s/del` → `~~`
 - 分隔线 `hr` → `---` / `<hr>`
-- 数学：优先 `annotation[encoding="application/x-tex"]` → `data-math-source` → `data-math` → `aria-label` → 回退 `katex-html` 可视文本；块级 `katex-display / math-display / qk-md-katext-block / eqn / [role=math][style*=block]` → `$$tex$$`，其余 `\$tex\$`；行内已含 `\$..\$` 不二次包裹；HTML 侧保留原始 KaTeX/MathML
+- 数学：优先 `annotation[encoding="application/x-tex"]` → `data-math-source` → `data-math` → `aria-label` → 回退 `katex-html` 可视文本（`.katex-html/.katex-mathml` 亦视为数学容器）；`katex-html` 无 `annotation` 时通过 `katexHtmlToTex` 解析 `mfrac(vlist top:-3.677em/-2.314em)`、`sqrt`、`msupsub`（基数取前一 `.mord` 兄弟）回退为 `\frac/\sqrt/^{}`；块级 `katex-display / math-display / qk-md-katext-block / eqn / [role=math][style*=block]` → `$$tex$$`，其余 `\$tex\$`；行内已含 `\$..\$` 不二次包裹；当 `searchRoot` 为 `SPAN.katex-html` 等视文本容器时，`renderRich/renderHtml` 直接判定 `isMath(root)` 并用 `closest(.katex)` 回溯取 `annotation`，避免仅选公式视文本时回落为 `ca+b`
 - 噪音 `<button> <svg> [aria-hidden] [data-testid*=copy]` 等在 `renderRich/renderHtml` 入口直接丢弃
 
 代码块仍走适配器围栏逻辑，与上述富文本在 `renderRich` 中按原 DOM 顺序共存；`cleanProse` 仅剥离 UI 词元并 `trimEnd` 保留列表缩进。
@@ -236,7 +236,7 @@ html 由序列化产物直接渲染，富文本块保留原始标签（`h1/block
 
 **小按钮复制**：除 `copy` 事件外，另在捕获阶段监听 `click`（`COPY_BUTTON_SELECTOR` + 文本 `复制/Copy` 回退），通过 `buttonBlock` 定位最近 `isBlock` 或 `findCodeBlocks` 容器，以 `forcedHeaderTouched=true` 调用 `buildCodePiece/markdownCode/htmlCode` 生成围栏，并经 `navigator.clipboard.write`（`ClipboardItem` 双格式）→ `writeText` → `execCommand` 三级回退写回；同时代理 `navigator.clipboard.writeText` 将站点按钮传入的裸代码替换为围栏版本。需 `permissions: ["clipboardWrite"]`。
 
-自动化测试：`npm run test:e2e` 用 jsdom 加载 `test/fixtures/` 合成夹具（禁用页面脚本），注入扩展代码后对每站点 × 七种选区起点断言纯文本与 html 输出，报告写入 `test/report.md`。
+自动化测试：`npm run test:e2e` 用 jsdom 加载 `test/fixtures/` 合成夹具（禁用页面脚本），注入扩展代码后对每站点 × 12 场景（`inner-whole/header-only/header+code/intro+block/partial-code/container-whole/whole-message` + `math:block-only/block+above/block+below/markdown-whole/partial-tail` + `parent:markdown-whole`）断言纯文本与 html 输出，报告写入 `test/report.md`；本地全量 `test/run-full.mjs`（不入库）可额外读仓库外自选目录的六份整页的 `DIV.markdown` 父容器链，覆盖单选/带上文/带下文/跨父容器等。
 
 ## 6. 测试策略
 

@@ -6,3 +6,7 @@ dist/
 .e2e-ext/
 .e2e-profile/
 test/report.md
+test/report-full.md
+test/fixtures/*.local.html
+test/fixtures-local/
+test/run-full.mjs

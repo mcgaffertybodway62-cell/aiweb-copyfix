@@ -1,6 +1,6 @@
 # 富文本测试内容
 
-各站点夹具来自同一份“生成Markdown测试内容”Prompt 的渲染语义，而不是用户快照本身。为避免隐私进入仓库，`test/fixtures/` 仅保留零隐私的最小 HTML（原始快照保存在仓库外的 `E:\Projects\想法\源码\完整bug`，含 deepseek/gemini/qwen/kimi/glm/GPT 六份）。
+各站点夹具来自同一份“生成Markdown测试内容”Prompt 的渲染语义，而不是用户快照本身。为避免隐私进入仓库，`test/fixtures/` 仅保留零隐私的最小 HTML（原始快照保存在仓库外的自选目录，不入库）。
 
 测试元素清单：`#` 标题、包含粗体/斜体/行内 code/链接/删除线的 `> 引用`、两段 `python`/`bash` 代码块、行内 `$E=mc^2$`、块级数学 `$$...$$`（含 `\frac` `\sqrt`）、三列表格（含对齐：Kimi 用 `align`，Qwen/GLM/GPT 用 `style:text-align`）、嵌套无序/有序列表、分隔线 `---`、行内 code 与链接。各夹具保留对应站点的真实容器与数学 DOM 特征：
 

@@ -24,8 +24,11 @@ util.textInRange = (container, range, ignore) => {
     if (!range.intersectsNode(n)) continue;
     if (ignore && n.parentElement?.closest(ignore)) continue;
     let s = n.textContent;
-    if (n === range.startContainer) s = s.slice(range.startOffset);
-    if (n === range.endContainer) s = s.slice(0, range.endOffset);
+    if (n === range.startContainer && n === range.endContainer) s = s.slice(range.startOffset, range.endOffset);
+    else {
+      if (n === range.startContainer) s = s.slice(range.startOffset);
+      if (n === range.endContainer) s = s.slice(0, range.endOffset);
+    }
     if (!s) continue;
     const p = n.parentElement;
     if (crossesBlockBoundary(prevParent, p)) out += "\n";
@@ -197,7 +200,7 @@ function normalizeCode(raw) {
     .replace(/^\n+/, "");
 }
 
-const UI_NOISE_TOKENS = /(复制|下载|拷贝|copy|download|重新生成|重试|regenerate|retry)/gi;
+const UI_NOISE_EXACT = /^(复制|下载|拷贝|copy|download|重新生成|重试|regenerate|retry)$/i;
 
 function cleanProse(piece) {
   return piece
@@ -205,8 +208,11 @@ function cleanProse(piece) {
     .map((para) =>
       para
         .split("\n")
-        .map((line) => line.replace(UI_NOISE_TOKENS, "").trimEnd())
-        .filter((line) => line.trim())
+        .map((line) => line.trimEnd())
+        .filter((line) => {
+          const t = line.trim();
+          return t && !UI_NOISE_EXACT.test(t);
+        })
         .join("\n"),
     )
     .filter(Boolean);
@@ -278,6 +284,7 @@ function collectBlocks(range, impl) {
 function selectedText(node, range) {
   if (node.nodeType !== Node.TEXT_NODE || !range.intersectsNode(node)) return "";
   let s = node.textContent;
+  if (node === range.startContainer && node === range.endContainer) return s.slice(range.startOffset, range.endOffset);
   if (node === range.startContainer) s = s.slice(range.startOffset);
   if (node === range.endContainer) s = s.slice(0, range.endOffset);
   return s;
@@ -295,12 +302,29 @@ function mathSource(el) {
   ).trim();
 }
 
+const MATH_SELECTOR = ".katex, .katex-display, .katex-wrapper, .katex-html, .katex-mathml, .math-display, .math-block, .math-inline, .qk-md-katext, .qk-md-katext-block, .qk-md-katext-inline, eqn, eq, math, [role='math'], [data-math-source], [data-math]";
+
 function isMath(el) {
-  return el.matches?.(".katex, .katex-display, .katex-wrapper, .katex-html, .katex-mathml, .math-display, .math-block, .math-inline, .qk-md-katext, .qk-md-katext-block, .qk-md-katext-inline, eqn, eq, math, [role='math'], [data-math-source], [data-math]");
+  return el.matches?.(MATH_SELECTOR);
 }
 
 function isMathBlock(el) {
   return el.matches?.(".katex-display, .math-display, .math-block, .katex-wrapper.math-display, .qk-md-katext-block, eqn, [role='math'][style*='block'], math[display='block']") || Boolean(el.closest?.(".katex-display, .math-display, .math-block, .katex-wrapper.math-display, .qk-md-katext-block, eqn, [role='math'][style*='block'], math[display='block']"));
+}
+
+function hasMathInRange(range) {
+  try {
+    const all = document.querySelectorAll(MATH_SELECTOR);
+    for (const el of all) if (range.intersectsNode(el)) return true;
+  } catch (e) { void e; }
+  for (const container of [range.startContainer, range.endContainer, range.commonAncestorContainer]) {
+    let cur = container.nodeType === Node.TEXT_NODE ? container.parentElement : container;
+    while (cur) {
+      if (isMath(cur)) return true;
+      cur = cur.parentElement;
+    }
+  }
+  return false;
 }
 
 function kimiMathTex(value) {
@@ -442,9 +466,13 @@ function alignOf(cell, table) {
 }
 
 function tableMarkdown(table, range, render) {
-  const rows = Array.from(table.querySelectorAll(":scope > thead > tr, :scope > tbody > tr, :scope > tr"));
-  if (!rows.length) return "";
-  const cells = rows.map((row) => Array.from(row.children).filter((x) => /^(TH|TD)$/.test(x.tagName)));
+  const allRows = Array.from(table.querySelectorAll(":scope > thead > tr, :scope > tbody > tr, :scope > tr"));
+  if (!allRows.length) return "";
+  const rows = allRows.filter((row) => range.intersectsNode(row));
+  const effectiveRows = rows.length ? rows : allRows.filter((row) => Array.from(row.children).some((c) => range.intersectsNode(c)));
+  const useRows = effectiveRows.length ? effectiveRows : allRows;
+  if (!useRows.length) return "";
+  const cells = useRows.map((row) => Array.from(row.children).filter((x) => /^(TH|TD)$/.test(x.tagName)));
   const width = Math.max(...cells.map((r) => r.length), 0);
   if (!width) return "";
   const lines = cells.map((row) => "| " + Array.from({ length: width }, (_, i) => (row[i] ? inlineMarkdown(row[i], range, (x) => render(x)) : "").replace(/\|/g, "\\|").replace(/\n/g, " ")).join(" | ") + " |");
@@ -459,13 +487,16 @@ function tableMarkdown(table, range, render) {
 
 function listMarkdown(list, range, render, depth = 0) {
   const ordered = list.tagName === "OL";
-  let number = Number(list.getAttribute("start")) || 1;
+  const start = Number(list.getAttribute("start")) || 1;
+  const lis = Array.from(list.children).filter((x) => x.tagName === "LI");
   const out = [];
-  for (const li of Array.from(list.children).filter((x) => x.tagName === "LI")) {
+  for (let idx = 0; idx < lis.length; idx++) {
+    const li = lis[idx];
     if (!range.intersectsNode(li)) continue;
     const nested = Array.from(li.children).filter((x) => x.matches("ul,ol"));
     const content = Array.from(li.childNodes).filter((x) => !(x.nodeType === Node.ELEMENT_NODE && x.matches("ul,ol"))).map((x) => x.nodeType === Node.TEXT_NODE ? selectedText(x, range) : inlineMarkdown(x, range, (y) => render(y))).join("").trim();
-    out.push("  ".repeat(depth) + (ordered ? number++ + ". " : "- ") + content);
+    const num = start + idx;
+    out.push("  ".repeat(depth) + (ordered ? num + ". " : "- ") + content);
     for (const child of nested) out.push(listMarkdown(child, range, render, depth + 1));
   }
   return out.join("\n");
@@ -488,7 +519,7 @@ function renderRich(root, range, codeSet, emitCode) {
     if (node.matches("ul,ol")) return listMarkdown(node, range, render);
     if (node.matches("hr")) return "---";
     if (node.matches("h1,h2,h3,h4,h5,h6")) return "#".repeat(Number(node.tagName.slice(1))) + " " + Array.from(node.childNodes).map((x) => inlineMarkdown(x, range, render)).join("").trim();
-    if (node.matches("blockquote")) return Array.from(node.childNodes).map((x) => render(x)).join("").split("\n").map((x) => "> " + x).join("\n");
+    if (node.matches("blockquote")) return Array.from(node.childNodes).map((x) => render(x)).filter(Boolean).join("\n").split("\n").map((x) => x ? "> " + x : ">").join("\n");
     if (node.matches("p,div,section,article")) {
       const parts = [];
       let inline = "";
@@ -566,7 +597,17 @@ function renderHtml(root, range, codeSet, emitCode) {
       return node.matches("hr") ? "<hr>" : "<" + node.tagName.toLowerCase() + attrs + ">" + Array.from(node.childNodes).map(render).join("") + "</" + node.tagName.toLowerCase() + ">";
     }
     if (node.matches("a[href]") && !/^javascript:/i.test(node.getAttribute("href"))) return `<a href="${escapeHtml(node.getAttribute("href"))}">${Array.from(node.childNodes).map(render).join("")}</a>`;
-    if (node.matches("strong,b,em,i,s,del,code,br")) return node.outerHTML.replace(/\s(?:class|style|onclick)="[^"]*"/gi, "");
+    if (node.matches("br")) return "<br>";
+    if (node.matches("strong,b,em,i,s,del")) {
+      const inner = Array.from(node.childNodes).map(render).join("");
+      if (!inner) return "";
+      return "<" + node.tagName.toLowerCase() + ">" + inner + "</" + node.tagName.toLowerCase() + ">";
+    }
+    if (node.matches("code")) {
+      const inner = Array.from(node.childNodes).map(render).join("");
+      if (!inner) return "";
+      return "<code>" + inner + "</code>";
+    }
     if (node.matches("div,section,article")) {
       const parts = [];
       let inline = "";
@@ -576,8 +617,7 @@ function renderHtml(root, range, codeSet, emitCode) {
         const block = child.nodeType === Node.ELEMENT_NODE && (
           codeSet.has(child) ||
           child.matches("table,ul,ol,hr,p,div,section,article,blockquote,h1,h2,h3,h4,h5,h6") ||
-          isMathBlock(child) ||
-          isMath(child)
+          isMathBlock(child)
         );
         if (block) {
           if (inline) {
@@ -693,6 +733,11 @@ function handleCopy(event) {
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
   const range = selection.getRangeAt(0);
   const impl = activeImpl();
+  try {
+    const { blocks } = collectBlocks(range, impl);
+    const hit = blocks.filter((p) => range.intersectsNode(p));
+    if (hit.length === 0 && !hasMathInRange(range)) return;
+  } catch (e) { void e; }
   let out;
   try {
     out = serialize(range, impl);

@@ -702,7 +702,9 @@ function serialize(range, impl) {
 function buildCodePiece(block, impl, range, forcedHeaderTouched = false) {
   const codeEl = impl.getCodeElement(block);
   const headerTouched = forcedHeaderTouched || Array.from(impl.headerNodes(block)).some((n) => range.intersectsNode(n));
-  const scope = fullyContains(range, codeEl) || headerTouched ? fullContentsRange(codeEl) : clippedToContents(codeEl, range);
+  const codeIntersects = range.intersectsNode(codeEl);
+  const isFull = fullyContains(range, codeEl) || (headerTouched && !codeIntersects);
+  const scope = isFull ? fullContentsRange(codeEl) : clippedToContents(codeEl, range);
   const text = util.textInRange(codeEl, scope, impl.ignoreSelector);
   const fullText = util.textInRange(codeEl, fullContentsRange(codeEl), impl.ignoreSelector);
   return {

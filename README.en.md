@@ -34,13 +34,15 @@ print(os.getcwd())
 ```
 ````
 
+> Whether the ``` fence is restored is controlled by `codeCopyFence` in `src/config.js`: by default (`false`) pure-code copies stay as plain raw code like the page's own copy; set to `true` to get the fenced format above. Mixed selections that include prose are not affected.
+
 ## Features
 
 - Intercepts `copy` events and rewrites the clipboard with correct structure
 - Dual flavor: clean Markdown as `text/plain`, sanitized HTML as `text/html`
 - Site adapters: DeepSeek, Gemini, Kimi, GLM, Qwen, ChatGPT — Claude covered by generic heuristics
 - Full Markdown fidelity: headings, blockquotes, tables, nested lists, inline code, links, bold/italic/strikethrough, horizontal rules, inline/block math
-- Fence rules: full block selection → fenced with language; partial selection → plain fragment (configurable)
+- Fence rules: whole-block selection and code-block copy buttons are configurable — plain raw code by default, opt into ` ``` ` fences; partial selection → plain fragment (configurable); mixed selections keep fences
 - UI chrome (language labels, copy/download buttons) is stripped from both flavors
 
 ## Supported Sites
@@ -78,6 +80,7 @@ Edit `src/config.js`, then reload the extension:
 | Option | Default | Description |
 | --- | --- | --- |
 | `fencePartialCode` | `false` | Whether a *partial* code selection also gets fenced. `false` = output raw text fragment; `true` = always emit a fenced block with language |
+| `codeCopyFence` | `false` | Format for *pure code* copies (clicking a code block's copy button, or a selection that covers whole code blocks only). `false` = plain raw code, same as the page's normal copy (default); `true` = ` ``` ` fenced block with language. Mixed selections that also contain prose still keep fences |
 
 ## Development
 

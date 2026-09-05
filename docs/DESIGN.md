@@ -166,8 +166,18 @@ GLM（`GLM.html`）：
 
 ### 围栏判定
 
-- 选区覆盖代码块**全部内容**（trim 后文本相等，容忍漏选首尾空白）→ 输出 ``` 围栏 + 语言名；
-- 只选中块内片段 → 输出纯文本片段，不加围栏（配置项 `fencePartialCode`，见 `src/config.js` 与 README「配置」）。
+围栏由两块正交的输入共同决定：
+
+- 复制是否「纯代码」：选区内的内容除代码块自身外没有正文（散文）。
+- 命中块是否「整块」：代码内容被完整覆盖（trim 后文本相等，容忍漏选首尾空白）。
+
+规则：
+
+- **非纯代码（混合选区，含说明文字）**：整块命中 → 加 ``` 围栏 + 语言名；只选中块内片段 → 纯文本片段。此分支不受 `codeCopyFence` 影响，保证「说明文字 + 代码块」等 Markdown 结构不退化；
+- **纯代码复制**（点代码块复制按钮，或选区只含完整代码块且不越出代码块，如整块全选、连头部一起选中）：是否加 ``` 围栏由配置项 `codeCopyFence` 决定——`false`（默认）= 与原页一致输出裸代码；`true` = 加 ``` 围栏 + 语言名；
+- 块内片段仍受 `fencePartialCode` 控制（见 `src/config.js` 与 README「配置」）。
+
+「纯代码」判定由 `wholeCodeCopy` 完成：要求每个命中块都整块覆盖，且对公共祖先做一次文本扫描——落在代码元素、结构性头部（`impl.headerNodes`）或 UI 噪声（按钮/图标等 `COPY_CHROME_SELECTOR`）内的文本一律放行，出现其余正文文本即判定为非纯代码。`wholeCodeCopy` 仅在 `codeCopyFence === false` 时执行。
 
 ### 候选块去重规则
 
@@ -234,9 +244,9 @@ html 由序列化产物直接渲染，富文本块保留原始标签（`h1/block
 
 通用容器（`p/div/section/article`）按“块级分段 + 行内拼接”策略 `join("\n\n")`，对 `codeSet/table/列表/标题/引用/hr/块级数学` 强制分段，避免连续两代码块 `pre` 同父时 `join("")` 合并。
 
-**小按钮复制**：除 `copy` 事件外，另在捕获阶段监听 `click`（`COPY_BUTTON_SELECTOR` + 文本 `复制/Copy` 回退），通过 `buttonBlock` 定位最近 `isBlock` 或 `findCodeBlocks` 容器，以 `forcedHeaderTouched=true` 调用 `buildCodePiece/markdownCode/htmlCode` 生成围栏，并经 `navigator.clipboard.write`（`ClipboardItem` 双格式）→ `writeText` → `execCommand` 三级回退写回；同时代理 `navigator.clipboard.writeText` 将站点按钮传入的裸代码替换为围栏版本。需 `permissions: ["clipboardWrite"]`。
+**小按钮复制**：除 `copy` 事件外，另在捕获阶段监听 `click`（`COPY_BUTTON_SELECTOR` + 文本 `复制/Copy` 回退），通过 `buttonBlock` 定位最近 `isBlock` 或 `findCodeBlocks` 容器，以 `forcedHeaderTouched=true` 调用 `buildCodePiece/markdownCode/htmlCode` 生成围栏，并经 `navigator.clipboard.write`（`ClipboardItem` 双格式）→ `writeText` → `execCommand` 三级回退写回；同时代理 `navigator.clipboard.writeText` 将站点按钮传入的裸代码替换为围栏版本。当 `codeCopyFence === false`（默认）时按钮路径整体放行，不拦截 click、也不改写剪贴板——复制结果与原页按钮完全一致。需 `permissions: ["clipboardWrite"]`。
 
-自动化测试：`npm run test:e2e` 用 jsdom 加载 `test/fixtures/` 合成夹具（禁用页面脚本），注入扩展代码后对每站点 × 12 场景（`inner-whole/header-only/header+code/intro+block/partial-code/container-whole/whole-message` + `math:block-only/block+above/block+below/markdown-whole/partial-tail` + `parent:markdown-whole`）断言纯文本与 html 输出，报告写入 `test/report.md`；本地全量 `test/run-full.mjs`（不入库）可额外读仓库外自选目录的六份整页的 `DIV.markdown` 父容器链，覆盖单选/带上文/带下文/跨父容器等。
+自动化测试：`npm run test:e2e` 用 jsdom 加载 `test/fixtures/` 合成夹具（禁用页面脚本），注入扩展代码后**分别在 `codeCopyFence=false/true` 两档**对每站点 × 12 场景（`inner-whole/header-only/header+code/intro+block/partial-code/container-whole/whole-message` + `math:block-only/block+above/block+below/markdown-whole/partial-tail` + `parent:markdown-whole`）断言纯文本与 html 输出：默认档下纯代码整块场景（`inner-whole/header+code/container-whole`）期望裸代码，围栏档及混合选区仍期望 ``` 围栏，报告写入 `test/report.md`；本地全量 `test/run-full.mjs`（不入库）可额外读仓库外自选目录的六份整页的 `DIV.markdown` 父容器链，覆盖单选/带上文/带下文/跨父容器等。
 
 ## 6. 测试策略
 

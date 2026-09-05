@@ -13,6 +13,7 @@ const LANG_NOISE = new Set(["copy", "code", "拷贝", "复制", "复制代码", 
 const LANGUAGE_PREFIX = "language-";
 const CONFIG = globalThis.AIWEB_COPYFIX_CONFIG ?? {};
 const FENCE_PARTIAL_CODE = CONFIG.fencePartialCode === true;
+const CODE_COPY_FENCE = CONFIG.codeCopyFence === true;
 
 util.findPres = (root) => Array.from(root.querySelectorAll("pre"));
 
@@ -662,6 +663,53 @@ function renderHtml(root, range, codeSet, emitCode) {
   return Array.from(root.childNodes).map(render).filter(Boolean).join("\n");
 }
 
+const COPY_CHROME_SELECTOR = "button,[role='button'],svg,[aria-hidden='true'],[data-testid*='copy'],[class*='copy-button'],[class*='toolbar'],[class*='action-bar'],[class*='code-info-button']";
+
+function wholeCodeCopy(range, blocks, impl) {
+  if (!blocks.length) return false;
+  for (const block of blocks) {
+    const codeEl = impl.getCodeElement(block);
+    if (!range.intersectsNode(codeEl)) return false;
+    const scope = fullyContains(range, codeEl)
+      ? fullContentsRange(codeEl)
+      : clippedToContents(codeEl, range);
+    const text = util.textInRange(codeEl, scope, impl.ignoreSelector);
+    const full = util.textInRange(codeEl, fullContentsRange(codeEl), impl.ignoreSelector);
+    if (text.trim() !== full.trim()) return false;
+  }
+  const codeEls = new Set(blocks.map((b) => impl.getCodeElement(b)));
+  const chromeEls = new Set();
+  for (const block of blocks) {
+    for (const h of impl.headerNodes(block)) chromeEls.add(h);
+  }
+  const inCodeOrChrome = (el) => {
+    let cur = el;
+    while (cur) {
+      if (codeEls.has(cur)) return true;
+      cur = cur.parentElement;
+    }
+    cur = el;
+    while (cur) {
+      if (chromeEls.has(cur) || cur.matches?.(COPY_CHROME_SELECTOR)) return true;
+      cur = cur.parentElement;
+    }
+    return false;
+  };
+  const ancestor = range.commonAncestorContainer;
+  const root =
+    ancestor.nodeType === Node.TEXT_NODE ? ancestor.parentElement : ancestor;
+  if (!root) return false;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (!range.intersectsNode(n)) continue;
+    if (!n.textContent.trim()) continue;
+    const p = n.parentElement;
+    if (p && inCodeOrChrome(p)) continue;
+    return false;
+  }
+  return true;
+}
+
 function serialize(range, impl) {
   const { searchRoot, blocks } = collectBlocks(range, impl);
   if (!searchRoot) return null;
@@ -669,9 +717,10 @@ function serialize(range, impl) {
   console.debug("[aiweb-copyfix] impl:", impl.id, "blocks:", hit.length);
   const codeSet = new Set(hit);
   const codeCache = new Map();
+  const pureWhole = !CODE_COPY_FENCE && wholeCodeCopy(range, hit, impl);
   const codePiece = (pre) => {
     if (codeCache.has(pre)) return codeCache.get(pre);
-    const piece = buildCodePiece(pre, impl, range);
+    const piece = buildCodePiece(pre, impl, range, false, pureWhole);
     codeCache.set(pre, piece);
     return piece;
   };
@@ -699,7 +748,7 @@ function serialize(range, impl) {
   return { plain, html };
 }
 
-function buildCodePiece(block, impl, range, forcedHeaderTouched = false) {
+function buildCodePiece(block, impl, range, forcedHeaderTouched = false, pureWhole = false) {
   const codeEl = impl.getCodeElement(block);
   const headerTouched = forcedHeaderTouched || Array.from(impl.headerNodes(block)).some((n) => range.intersectsNode(n));
   const codeIntersects = range.intersectsNode(codeEl);
@@ -707,22 +756,26 @@ function buildCodePiece(block, impl, range, forcedHeaderTouched = false) {
   const scope = isFull ? fullContentsRange(codeEl) : clippedToContents(codeEl, range);
   const text = util.textInRange(codeEl, scope, impl.ignoreSelector);
   const fullText = util.textInRange(codeEl, fullContentsRange(codeEl), impl.ignoreSelector);
+  const whole = text.trim() === fullText.trim();
+  const fence = pureWhole
+    ? FENCE_PARTIAL_CODE || CODE_COPY_FENCE
+    : FENCE_PARTIAL_CODE || headerTouched || whole;
   return {
     lang: impl.getLanguage(block),
     code: text,
-    fence: FENCE_PARTIAL_CODE || headerTouched || text.trim() === fullText.trim(),
+    fence,
   };
 }
 
-function markdownCode(block, impl, range, forcedHeaderTouched = false) {
-  const piece = buildCodePiece(block, impl, range, forcedHeaderTouched);
+function markdownCode(block, impl, range, forcedHeaderTouched = false, pureWhole = false) {
+  const piece = buildCodePiece(block, impl, range, forcedHeaderTouched, pureWhole);
   const code = normalizeCode(piece.code);
   if (!code) return "";
   return piece.fence === false ? code : "```" + (piece.lang ?? "") + "\n" + code + "\n```";
 }
 
-function htmlCode(block, impl, range, forcedHeaderTouched = false) {
-  const piece = buildCodePiece(block, impl, range, forcedHeaderTouched);
+function htmlCode(block, impl, range, forcedHeaderTouched = false, pureWhole = false) {
+  const piece = buildCodePiece(block, impl, range, forcedHeaderTouched, pureWhole);
   const code = normalizeCode(piece.code);
   if (!code) return "";
   if (piece.fence === false) return "<p>" + escapeHtml(code).replace(/\n/g, "<br>") + "</p>";
@@ -838,6 +891,7 @@ function handleCopyButton(event) {
   const impl = activeImpl();
   const block = buttonBlock(button, impl);
   if (!block) return;
+  if (!CODE_COPY_FENCE) return;
   const range = fullContentsRange(block);
   const codeEl = impl.getCodeElement(block);
   const plain = markdownCode(block, impl, range, true);

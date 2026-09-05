@@ -30,13 +30,13 @@
 ## 调试与验证
 
 - 代码改动后必须：`chrome://extensions/` 点 ↻ 重载扩展 **并刷新目标页面**（MV3 内容脚本只在页面加载时注入）
-- 自动化测试：`npm run test:e2e`（jsdom 加载 `test/fixtures/` 合成夹具 × 七种选区起点 × 五站点，报告见 `test/report.md`）。改序列化逻辑后必须跑绿再交付；CI 在 push/PR 时自动执行
+- 自动化测试：`npm run test:e2e`（jsdom 加载 `test/fixtures/` 合成夹具，`codeCopyFence=false/true` 两档 × 各站点 × 各选区场景，报告见 `test/report.md`）。改序列化逻辑后必须跑绿再交付；CI 在 push/PR 时自动执行
 - 手动抽查仅剩两类：真实站点的登录后渲染差异、富文本编辑器（Typora/语雀）的粘贴表现
 
 | 场景 | 期望 |
 | --- | --- |
-| 仅选代码块 | 输出带语言围栏的完整块 |
-| 选「说明文字 + 代码块」 | 正文与围栏块以空行分隔，无按钮文字泄漏 |
+| 仅选代码块 / 点复制按钮 | 默认输出裸代码（`codeCopyFence=false`）；开启 `codeCopyFence` 后输出带语言围栏的完整块 |
+| 选「说明文字 + 代码块」 | 正文与围栏块以空行分隔，无按钮文字泄漏（不受 `codeCopyFence` 影响） |
 | 跨两条消息选区 | 各代码块独立成围栏 |
 | 粘贴到 VS Code / QQ | 读 text/plain，Markdown 正确 |
 | 粘贴到 Typora / 语雀 | 读 text/html，无 banner 噪音，有语法高亮 |

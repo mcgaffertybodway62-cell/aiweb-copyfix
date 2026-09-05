@@ -64,6 +64,7 @@ const SITES = [
 ];
 
 const INDEX = fs.readFileSync(path.join(ROOT, "src/content/index.js"), "utf8");
+const CONFIG_SRC = fs.readFileSync(path.join(ROOT, "src/config.js"), "utf8");
 const ADAPTERS = fs
   .readdirSync(path.join(ROOT, "src/content/adapters"))
   .sort()
@@ -72,10 +73,12 @@ const ADAPTERS = fs
     code: fs.readFileSync(path.join(ROOT, "src/content/adapters", f), "utf8"),
   }));
 
-function bootDom(site) {
+function bootDom(site, fence) {
   const html = fs.readFileSync(path.join(DOCS, site.file), "utf8");
   const dom = new JSDOM(html, { url: site.url, runScripts: "outside-only" });
   const { window } = dom;
+  window.eval(CONFIG_SRC);
+  if (fence) window.eval("globalThis.AIWEB_COPYFIX_CONFIG.codeCopyFence = true;");
   window.eval(INDEX);
   for (const a of ADAPTERS) window.eval(a.code);
   return dom.window;
@@ -228,7 +231,9 @@ function scenarios(window, site) {
   return out;
 }
 
-function judge(site, r) {
+const PURE_WHOLE = new Set(["inner-whole", "header+code", "container-whole"]);
+
+function judge(site, r, fence) {
   if (r.error) return { status: "SKIP", reason: r.error };
   if (!r.canceled) return { status: "FAIL", reason: "copy event not intercepted" };
   const fenced = r.plain.includes("```");
@@ -244,44 +249,57 @@ function judge(site, r) {
     if (fenced) reasons.push("expected raw fragment but found fence");
     if (r.html && r.html.includes("<pre")) reasons.push("html should not contain pre for fragment");
   } else {
-    if (!fenced) reasons.push("missing fence");
-    else if (!r.plain.includes("```" + site.lang)) reasons.push(`fence language != ${site.lang}`);
+    const expectFence = PURE_WHOLE.has(r.name) ? fence : true;
+    if (expectFence) {
+      if (!fenced) reasons.push("missing fence");
+      else if (!r.plain.includes("```" + site.lang)) reasons.push(`fence language != ${site.lang}`);
+    } else {
+      if (fenced) reasons.push("expected raw code but found fence");
+      if (r.html && r.html.includes("<pre")) reasons.push("html should not contain pre for raw code");
+    }
   }
   if (noisy.length) reasons.push(`noise leaked: ${noisy.join(",")}`);
   if (reasons.length) return { status: "FAIL", reason: reasons.join("; ") };
   return { status: "PASS", reason: "" };
 }
 
+const MODES = [
+  { label: "default", fence: false },
+  { label: "fence", fence: true },
+];
+
 const report = [];
 let pass = 0;
 let fail = 0;
 for (const site of SITES) {
-  let window;
-  try {
-    window = bootDom(site);
-  } catch (err) {
-    report.push({ site: site.name, scenario: "*", status: "FAIL", reason: "dom boot: " + err.message });
-    fail++;
-    continue;
+  for (const mode of MODES) {
+    let window;
+    try {
+      window = bootDom(site, mode.fence);
+    } catch (err) {
+      report.push({ site: site.name, scenario: "*", status: "FAIL", reason: "dom boot: " + err.message });
+      fail++;
+      continue;
+    }
+    injectHelpers(window);
+    const adapterIds = window.eval("AICopyFix.adapters.map(a => a.id)").join(",");
+    const matched = window.eval(
+      `AICopyFix.adapters.some(a => a.match(location))`,
+    );
+    for (const r of scenarios(window, site)) {
+      const j = judge(site, r, mode.fence);
+      if (j.status === "PASS") pass++;
+      else if (j.status === "FAIL") fail++;
+      report.push({
+        site: `${site.name}${matched ? "" : "(NO-MATCH!)"}[${mode.label}]`,
+        scenario: r.name,
+        status: j.status,
+        reason: [!matched ? "adapter match() false" : "", j.reason].filter(Boolean).join("; "),
+        head: (r.plain ?? "").slice(0, 70).replace(/\n/g, "\\n"),
+      });
+    }
+    void adapterIds;
   }
-  injectHelpers(window);
-  const adapterIds = window.eval("AICopyFix.adapters.map(a => a.id)").join(",");
-  const matched = window.eval(
-    `AICopyFix.adapters.some(a => a.match(location))`,
-  );
-  for (const r of scenarios(window, site)) {
-    const j = judge(site, r);
-    if (j.status === "PASS") pass++;
-    else if (j.status === "FAIL") fail++;
-    report.push({
-      site: `${site.name}${matched ? "" : "(NO-MATCH!)"}`,
-      scenario: r.name,
-      status: j.status,
-      reason: [!matched ? "adapter match() false" : "", j.reason].filter(Boolean).join("; "),
-      head: (r.plain ?? "").slice(0, 70).replace(/\n/g, "\\n"),
-    });
-  }
-  void adapterIds;
 }
 
 console.table(report.map(({ site, scenario, status, reason }) => ({ site, scenario, status, reason })));
